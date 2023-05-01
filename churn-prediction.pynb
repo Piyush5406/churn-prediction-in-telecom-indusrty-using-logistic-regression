@@ -1,0 +1,2917 @@
+Business problem overview
+In the telecom industry, customers are able to choose from multiple service providers and actively switch from one operator to another. In this highly competitive market, the telecommunications industry experiences an average of 15-25% annual churn rate. Given the fact that it costs 5-10 times more to acquire a new customer than to retain an existing one, customer retention has now become even more important than customer acquisition.
+
+For many incumbent operators, retaining high profitable customers is the number one business goal.
+
+To reduce customer churn, telecom companies need to predict which customers are at high risk of churn.
+
+Here we will analyse customer-level data of a leading telecom firm, build predictive models to identify customers at high risk of churn and identify the main indicators of churn.
+
+Customers usually do not decide to switch to another competitor instantly, but rather over a period of time (this is especially applicable to high-value customers). In churn prediction, we assume that there are three phases of customer lifecycle :
+
+The ‘good’ phase: In this phase, the customer is happy with the service and behaves as usual.
+
+The ‘action’ phase: The customer experience starts to sore in this phase, for e.g. he/she gets a compelling offer from a competitor, faces unjust charges, becomes unhappy with service quality etc. In this phase, the customer usually shows different behaviour than the ‘good’ months. Also, it is crucial to identify high-churn-risk customers in this phase, since some corrective actions can be taken at this point (such as matching the competitor’s offer/improving the service quality etc.)
+
+The ‘churn’ phase: In this phase, the customer is said to have churned. You define churn based on this phase. Also, it is important to note that at the time of prediction (i.e. the action months), this data is not available to you for prediction. Thus, after tagging churn as 1/0 based on this phase, you discard all data corresponding to this phase.
+
+Exporting required libraries
+# Installing external packages
+#!pip install missingno
+#!pip install imbalanced-learn
+#!pip install joblib
+# Mounting Google drive
+#from google.colab import drive
+#drive.mount('/content/drive')
+Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount("/content/drive", force_remount=True).
+# Importing required libaries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import missingno as msno
+from sklearn.externals import joblib
+from sklearn.feature_selection import VarianceThreshold, RFE
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import RobustScaler, MinMaxScaler
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, roc_auc_score, f1_score, plot_confusion_matrix, plot_roc_curve, classification_report
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier, plot_importance
+from imblearn.over_sampling import SMOTE
+import statsmodels.api as sm
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import warnings
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
+%matplotlib inline
+Reading and understanding the data¶
+# Loading data
+data0= pd.read_csv('telecom_churn_data.csv')
+data0.head()
+mobile_number	circle_id	loc_og_t2o_mou	std_og_t2o_mou	loc_ic_t2o_mou	last_date_of_month_6	last_date_of_month_7	last_date_of_month_8	last_date_of_month_9	arpu_6	arpu_7	arpu_8	arpu_9	onnet_mou_6	onnet_mou_7	onnet_mou_8	onnet_mou_9	offnet_mou_6	offnet_mou_7	offnet_mou_8	offnet_mou_9	roam_ic_mou_6	roam_ic_mou_7	roam_ic_mou_8	roam_ic_mou_9	roam_og_mou_6	roam_og_mou_7	roam_og_mou_8	roam_og_mou_9	loc_og_t2t_mou_6	loc_og_t2t_mou_7	loc_og_t2t_mou_8	loc_og_t2t_mou_9	loc_og_t2m_mou_6	loc_og_t2m_mou_7	loc_og_t2m_mou_8	loc_og_t2m_mou_9	loc_og_t2f_mou_6	loc_og_t2f_mou_7	loc_og_t2f_mou_8	loc_og_t2f_mou_9	loc_og_t2c_mou_6	loc_og_t2c_mou_7	loc_og_t2c_mou_8	loc_og_t2c_mou_9	loc_og_mou_6	loc_og_mou_7	loc_og_mou_8	loc_og_mou_9	std_og_t2t_mou_6	std_og_t2t_mou_7	std_og_t2t_mou_8	std_og_t2t_mou_9	std_og_t2m_mou_6	std_og_t2m_mou_7	std_og_t2m_mou_8	std_og_t2m_mou_9	std_og_t2f_mou_6	std_og_t2f_mou_7	std_og_t2f_mou_8	std_og_t2f_mou_9	std_og_t2c_mou_6	std_og_t2c_mou_7	std_og_t2c_mou_8	std_og_t2c_mou_9	std_og_mou_6	std_og_mou_7	std_og_mou_8	std_og_mou_9	isd_og_mou_6	isd_og_mou_7	isd_og_mou_8	isd_og_mou_9	spl_og_mou_6	spl_og_mou_7	spl_og_mou_8	spl_og_mou_9	og_others_6	og_others_7	og_others_8	og_others_9	total_og_mou_6	total_og_mou_7	total_og_mou_8	total_og_mou_9	loc_ic_t2t_mou_6	loc_ic_t2t_mou_7	loc_ic_t2t_mou_8	loc_ic_t2t_mou_9	loc_ic_t2m_mou_6	loc_ic_t2m_mou_7	loc_ic_t2m_mou_8	loc_ic_t2m_mou_9	loc_ic_t2f_mou_6	loc_ic_t2f_mou_7	loc_ic_t2f_mou_8	loc_ic_t2f_mou_9	loc_ic_mou_6	loc_ic_mou_7	loc_ic_mou_8	loc_ic_mou_9	std_ic_t2t_mou_6	std_ic_t2t_mou_7	std_ic_t2t_mou_8	std_ic_t2t_mou_9	std_ic_t2m_mou_6	std_ic_t2m_mou_7	std_ic_t2m_mou_8	std_ic_t2m_mou_9	std_ic_t2f_mou_6	std_ic_t2f_mou_7	std_ic_t2f_mou_8	std_ic_t2f_mou_9	std_ic_t2o_mou_6	std_ic_t2o_mou_7	std_ic_t2o_mou_8	std_ic_t2o_mou_9	std_ic_mou_6	std_ic_mou_7	std_ic_mou_8	std_ic_mou_9	total_ic_mou_6	total_ic_mou_7	total_ic_mou_8	total_ic_mou_9	spl_ic_mou_6	spl_ic_mou_7	spl_ic_mou_8	spl_ic_mou_9	isd_ic_mou_6	isd_ic_mou_7	isd_ic_mou_8	isd_ic_mou_9	ic_others_6	ic_others_7	ic_others_8	ic_others_9	total_rech_num_6	total_rech_num_7	total_rech_num_8	total_rech_num_9	total_rech_amt_6	total_rech_amt_7	total_rech_amt_8	total_rech_amt_9	max_rech_amt_6	max_rech_amt_7	max_rech_amt_8	max_rech_amt_9	date_of_last_rech_6	date_of_last_rech_7	date_of_last_rech_8	date_of_last_rech_9	last_day_rch_amt_6	last_day_rch_amt_7	last_day_rch_amt_8	last_day_rch_amt_9	date_of_last_rech_data_6	date_of_last_rech_data_7	date_of_last_rech_data_8	date_of_last_rech_data_9	total_rech_data_6	total_rech_data_7	total_rech_data_8	total_rech_data_9	max_rech_data_6	max_rech_data_7	max_rech_data_8	max_rech_data_9	count_rech_2g_6	count_rech_2g_7	count_rech_2g_8	count_rech_2g_9	count_rech_3g_6	count_rech_3g_7	count_rech_3g_8	count_rech_3g_9	av_rech_amt_data_6	av_rech_amt_data_7	av_rech_amt_data_8	av_rech_amt_data_9	vol_2g_mb_6	vol_2g_mb_7	vol_2g_mb_8	vol_2g_mb_9	vol_3g_mb_6	vol_3g_mb_7	vol_3g_mb_8	vol_3g_mb_9	arpu_3g_6	arpu_3g_7	arpu_3g_8	arpu_3g_9	arpu_2g_6	arpu_2g_7	arpu_2g_8	arpu_2g_9	night_pck_user_6	night_pck_user_7	night_pck_user_8	night_pck_user_9	monthly_2g_6	monthly_2g_7	monthly_2g_8	monthly_2g_9	sachet_2g_6	sachet_2g_7	sachet_2g_8	sachet_2g_9	monthly_3g_6	monthly_3g_7	monthly_3g_8	monthly_3g_9	sachet_3g_6	sachet_3g_7	sachet_3g_8	sachet_3g_9	fb_user_6	fb_user_7	fb_user_8	fb_user_9	aon	aug_vbc_3g	jul_vbc_3g	jun_vbc_3g	sep_vbc_3g
+0	7000842753	109	0.0	0.0	0.0	6/30/2014	7/31/2014	8/31/2014	9/30/2014	197.385	214.816	213.803	21.100	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.0	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.0	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.0	NaN	0.00	0.00	0.00	0.00	NaN	NaN	0.16	NaN	NaN	NaN	4.13	NaN	NaN	NaN	1.15	NaN	NaN	NaN	5.44	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.0	NaN	NaN	NaN	0.00	NaN	0.00	0.00	5.44	0.00	NaN	NaN	0.0	NaN	NaN	NaN	0.0	NaN	NaN	NaN	0.0	NaN	4	3	2	6	362	252	252	0	252	252	252	0	6/21/2014	7/16/2014	8/8/2014	9/28/2014	252	252	252	0	6/21/2014	7/16/2014	8/8/2014	NaN	1.0	1.0	1.0	NaN	252.0	252.0	252.0	NaN	0.0	0.0	0.0	NaN	1.0	1.0	1.0	NaN	252.0	252.0	252.0	NaN	30.13	1.32	5.75	0.0	83.57	150.76	109.61	0.00	212.17	212.17	212.17	NaN	212.17	212.17	212.17	NaN	0.0	0.0	0.0	NaN	0	0	0	0	0	0	0	0	1	1	1	0	0	0	0	0	1.0	1.0	1.0	NaN	968	30.4	0.0	101.20	3.58
+1	7001865778	109	0.0	0.0	0.0	6/30/2014	7/31/2014	8/31/2014	9/30/2014	34.047	355.074	268.321	86.285	24.11	78.68	7.68	18.34	15.74	99.84	304.76	53.76	0.0	0.00	0.00	0.00	0.0	0.00	0.00	0.00	23.88	74.56	7.68	18.34	11.51	75.94	291.86	53.76	0.00	0.00	0.00	0.00	0.0	2.91	0.00	0.00	35.39	150.51	299.54	72.11	0.23	4.11	0.00	0.00	0.00	0.46	0.13	0.00	0.00	0.00	0.00	0.0	0.0	0.0	0.0	0.0	0.23	4.58	0.13	0.00	0.0	0.0	0.0	0.0	4.68	23.43	12.76	0.00	0.00	0.0	0.0	0.0	40.31	178.53	312.44	72.11	1.61	29.91	29.23	116.09	17.48	65.38	375.58	56.93	0.00	8.93	3.61	0.00	19.09	104.23	408.43	173.03	0.00	0.00	2.35	0.00	5.90	0.00	12.49	15.01	0.00	0.00	0.00	0.00	0.0	0.0	0.0	0.0	5.90	0.00	14.84	15.01	26.83	104.23	423.28	188.04	0.00	0.0	0.0	0.00	1.83	0.00	0.0	0.00	0.00	0.00	0.0	0.00	4	9	11	5	74	384	283	121	44	154	65	50	6/29/2014	7/31/2014	8/28/2014	9/30/2014	44	23	30	0	NaN	7/25/2014	8/10/2014	NaN	NaN	1.0	2.0	NaN	NaN	154.0	25.0	NaN	NaN	1.0	2.0	NaN	NaN	0.0	0.0	NaN	NaN	154.0	50.0	NaN	0.00	108.07	365.47	0.0	0.00	0.00	0.00	0.00	NaN	0.00	0.00	NaN	NaN	28.61	7.60	NaN	NaN	0.0	0.0	NaN	0	1	0	0	0	0	2	0	0	0	0	0	0	0	0	0	NaN	1.0	1.0	NaN	1006	0.0	0.0	0.00	0.00
+2	7001625959	109	0.0	0.0	0.0	6/30/2014	7/31/2014	8/31/2014	9/30/2014	167.690	189.058	210.226	290.714	11.54	55.24	37.26	74.81	143.33	220.59	208.36	118.91	0.0	0.00	0.00	38.49	0.0	0.00	0.00	70.94	7.19	28.74	13.58	14.39	29.34	16.86	38.46	28.16	24.11	21.79	15.61	22.24	0.0	135.54	45.76	0.48	60.66	67.41	67.66	64.81	4.34	26.49	22.58	8.76	41.81	67.41	75.53	9.28	1.48	14.76	22.83	0.0	0.0	0.0	0.0	0.0	47.64	108.68	120.94	18.04	0.0	0.0	0.0	0.0	46.56	236.84	96.84	42.08	0.45	0.0	0.0	0.0	155.33	412.94	285.46	124.94	115.69	71.11	67.46	148.23	14.38	15.44	38.89	38.98	99.48	122.29	49.63	158.19	229.56	208.86	155.99	345.41	72.41	71.29	28.69	49.44	45.18	177.01	167.09	118.18	21.73	58.34	43.23	3.86	0.0	0.0	0.0	0.0	139.33	306.66	239.03	171.49	370.04	519.53	395.03	517.74	0.21	0.0	0.0	0.45	0.00	0.85	0.0	0.01	0.93	3.14	0.0	0.36	5	4	2	7	168	315	116	358	86	200	86	100	6/17/2014	7/24/2014	8/14/2014	9/29/2014	0	200	86	0	NaN	NaN	NaN	9/17/2014	NaN	NaN	NaN	1.0	NaN	NaN	NaN	46.0	NaN	NaN	NaN	1.0	NaN	NaN	NaN	0.0	NaN	NaN	NaN	46.0	0.00	0.00	0.00	0.0	0.00	0.00	0.00	8.42	NaN	NaN	NaN	2.84	NaN	NaN	NaN	0.0	NaN	NaN	NaN	0.0	0	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0	NaN	NaN	NaN	1.0	1103	0.0	0.0	4.17	0.00
+3	7001204172	109	0.0	0.0	0.0	6/30/2014	7/31/2014	8/31/2014	9/30/2014	221.338	251.102	508.054	389.500	99.91	54.39	310.98	241.71	123.31	109.01	71.68	113.54	0.0	54.86	44.38	0.00	0.0	28.09	39.04	0.00	73.68	34.81	10.61	15.49	107.43	83.21	22.46	65.46	1.91	0.65	4.91	2.06	0.0	0.00	0.00	0.00	183.03	118.68	37.99	83.03	26.23	14.89	289.58	226.21	2.99	1.73	6.53	9.99	0.00	0.00	0.00	0.0	0.0	0.0	0.0	0.0	29.23	16.63	296.11	236.21	0.0	0.0	0.0	0.0	10.96	0.00	18.09	43.29	0.00	0.0	0.0	0.0	223.23	135.31	352.21	362.54	62.08	19.98	8.04	41.73	113.96	64.51	20.28	52.86	57.43	27.09	19.84	65.59	233.48	111.59	48.18	160.19	43.48	66.44	0.00	129.84	1.33	38.56	4.94	13.98	1.18	0.00	0.00	0.00	0.0	0.0	0.0	0.0	45.99	105.01	4.94	143.83	280.08	216.61	53.13	305.38	0.59	0.0	0.0	0.55	0.00	0.00	0.0	0.00	0.00	0.00	0.0	0.80	10	11	18	14	230	310	601	410	60	50	50	50	6/28/2014	7/31/2014	8/31/2014	9/30/2014	30	50	50	30	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0.00	0.00	0.00	0.0	0.00	0.00	0.00	0.00	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	NaN	NaN	NaN	NaN	2491	0.0	0.0	0.00	0.00
+4	7000142493	109	0.0	0.0	0.0	6/30/2014	7/31/2014	8/31/2014	9/30/2014	261.636	309.876	238.174	163.426	50.31	149.44	83.89	58.78	76.96	91.88	124.26	45.81	0.0	0.00	0.00	0.00	0.0	0.00	0.00	0.00	50.31	149.44	83.89	58.78	67.64	91.88	124.26	37.89	0.00	0.00	0.00	1.93	0.0	0.00	0.00	0.00	117.96	241.33	208.16	98.61	0.00	0.00	0.00	0.00	9.31	0.00	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0	0.0	0.0	9.31	0.00	0.00	0.00	0.0	0.0	0.0	0.0	0.00	0.00	0.00	5.98	0.00	0.0	0.0	0.0	127.28	241.33	208.16	104.59	105.68	88.49	233.81	154.56	106.84	109.54	104.13	48.24	1.50	0.00	0.00	0.00	214.03	198.04	337.94	202.81	0.00	0.00	0.86	2.31	1.93	0.25	0.00	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0	0.0	1.93	0.25	0.86	2.31	216.44	198.29	338.81	205.31	0.00	0.0	0.0	0.18	0.00	0.00	0.0	0.00	0.48	0.00	0.0	0.00	5	6	3	4	196	350	287	200	56	110	110	50	6/26/2014	7/28/2014	8/9/2014	9/28/2014	50	110	110	50	6/4/2014	NaN	NaN	NaN	1.0	NaN	NaN	NaN	56.0	NaN	NaN	NaN	1.0	NaN	NaN	NaN	0.0	NaN	NaN	NaN	56.0	NaN	NaN	NaN	0.00	0.00	0.00	0.0	0.00	0.00	0.00	0.00	0.00	NaN	NaN	NaN	0.00	NaN	NaN	NaN	0.0	NaN	NaN	NaN	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0.0	NaN	NaN	NaN	1526	0.0	0.0	0.00	0.00
+# Checking shape of dataframe
+data0.shape
+(99999, 226)
+#Checking dataframe info
+data0.info(verbose= 1)
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 99999 entries, 0 to 99998
+Data columns (total 226 columns):
+ #   Column                    Dtype  
+---  ------                    -----  
+ 0   mobile_number             int64  
+ 1   circle_id                 int64  
+ 2   loc_og_t2o_mou            float64
+ 3   std_og_t2o_mou            float64
+ 4   loc_ic_t2o_mou            float64
+ 5   last_date_of_month_6      object 
+ 6   last_date_of_month_7      object 
+ 7   last_date_of_month_8      object 
+ 8   last_date_of_month_9      object 
+ 9   arpu_6                    float64
+ 10  arpu_7                    float64
+ 11  arpu_8                    float64
+ 12  arpu_9                    float64
+ 13  onnet_mou_6               float64
+ 14  onnet_mou_7               float64
+ 15  onnet_mou_8               float64
+ 16  onnet_mou_9               float64
+ 17  offnet_mou_6              float64
+ 18  offnet_mou_7              float64
+ 19  offnet_mou_8              float64
+ 20  offnet_mou_9              float64
+ 21  roam_ic_mou_6             float64
+ 22  roam_ic_mou_7             float64
+ 23  roam_ic_mou_8             float64
+ 24  roam_ic_mou_9             float64
+ 25  roam_og_mou_6             float64
+ 26  roam_og_mou_7             float64
+ 27  roam_og_mou_8             float64
+ 28  roam_og_mou_9             float64
+ 29  loc_og_t2t_mou_6          float64
+ 30  loc_og_t2t_mou_7          float64
+ 31  loc_og_t2t_mou_8          float64
+ 32  loc_og_t2t_mou_9          float64
+ 33  loc_og_t2m_mou_6          float64
+ 34  loc_og_t2m_mou_7          float64
+ 35  loc_og_t2m_mou_8          float64
+ 36  loc_og_t2m_mou_9          float64
+ 37  loc_og_t2f_mou_6          float64
+ 38  loc_og_t2f_mou_7          float64
+ 39  loc_og_t2f_mou_8          float64
+ 40  loc_og_t2f_mou_9          float64
+ 41  loc_og_t2c_mou_6          float64
+ 42  loc_og_t2c_mou_7          float64
+ 43  loc_og_t2c_mou_8          float64
+ 44  loc_og_t2c_mou_9          float64
+ 45  loc_og_mou_6              float64
+ 46  loc_og_mou_7              float64
+ 47  loc_og_mou_8              float64
+ 48  loc_og_mou_9              float64
+ 49  std_og_t2t_mou_6          float64
+ 50  std_og_t2t_mou_7          float64
+ 51  std_og_t2t_mou_8          float64
+ 52  std_og_t2t_mou_9          float64
+ 53  std_og_t2m_mou_6          float64
+ 54  std_og_t2m_mou_7          float64
+ 55  std_og_t2m_mou_8          float64
+ 56  std_og_t2m_mou_9          float64
+ 57  std_og_t2f_mou_6          float64
+ 58  std_og_t2f_mou_7          float64
+ 59  std_og_t2f_mou_8          float64
+ 60  std_og_t2f_mou_9          float64
+ 61  std_og_t2c_mou_6          float64
+ 62  std_og_t2c_mou_7          float64
+ 63  std_og_t2c_mou_8          float64
+ 64  std_og_t2c_mou_9          float64
+ 65  std_og_mou_6              float64
+ 66  std_og_mou_7              float64
+ 67  std_og_mou_8              float64
+ 68  std_og_mou_9              float64
+ 69  isd_og_mou_6              float64
+ 70  isd_og_mou_7              float64
+ 71  isd_og_mou_8              float64
+ 72  isd_og_mou_9              float64
+ 73  spl_og_mou_6              float64
+ 74  spl_og_mou_7              float64
+ 75  spl_og_mou_8              float64
+ 76  spl_og_mou_9              float64
+ 77  og_others_6               float64
+ 78  og_others_7               float64
+ 79  og_others_8               float64
+ 80  og_others_9               float64
+ 81  total_og_mou_6            float64
+ 82  total_og_mou_7            float64
+ 83  total_og_mou_8            float64
+ 84  total_og_mou_9            float64
+ 85  loc_ic_t2t_mou_6          float64
+ 86  loc_ic_t2t_mou_7          float64
+ 87  loc_ic_t2t_mou_8          float64
+ 88  loc_ic_t2t_mou_9          float64
+ 89  loc_ic_t2m_mou_6          float64
+ 90  loc_ic_t2m_mou_7          float64
+ 91  loc_ic_t2m_mou_8          float64
+ 92  loc_ic_t2m_mou_9          float64
+ 93  loc_ic_t2f_mou_6          float64
+ 94  loc_ic_t2f_mou_7          float64
+ 95  loc_ic_t2f_mou_8          float64
+ 96  loc_ic_t2f_mou_9          float64
+ 97  loc_ic_mou_6              float64
+ 98  loc_ic_mou_7              float64
+ 99  loc_ic_mou_8              float64
+ 100 loc_ic_mou_9              float64
+ 101 std_ic_t2t_mou_6          float64
+ 102 std_ic_t2t_mou_7          float64
+ 103 std_ic_t2t_mou_8          float64
+ 104 std_ic_t2t_mou_9          float64
+ 105 std_ic_t2m_mou_6          float64
+ 106 std_ic_t2m_mou_7          float64
+ 107 std_ic_t2m_mou_8          float64
+ 108 std_ic_t2m_mou_9          float64
+ 109 std_ic_t2f_mou_6          float64
+ 110 std_ic_t2f_mou_7          float64
+ 111 std_ic_t2f_mou_8          float64
+ 112 std_ic_t2f_mou_9          float64
+ 113 std_ic_t2o_mou_6          float64
+ 114 std_ic_t2o_mou_7          float64
+ 115 std_ic_t2o_mou_8          float64
+ 116 std_ic_t2o_mou_9          float64
+ 117 std_ic_mou_6              float64
+ 118 std_ic_mou_7              float64
+ 119 std_ic_mou_8              float64
+ 120 std_ic_mou_9              float64
+ 121 total_ic_mou_6            float64
+ 122 total_ic_mou_7            float64
+ 123 total_ic_mou_8            float64
+ 124 total_ic_mou_9            float64
+ 125 spl_ic_mou_6              float64
+ 126 spl_ic_mou_7              float64
+ 127 spl_ic_mou_8              float64
+ 128 spl_ic_mou_9              float64
+ 129 isd_ic_mou_6              float64
+ 130 isd_ic_mou_7              float64
+ 131 isd_ic_mou_8              float64
+ 132 isd_ic_mou_9              float64
+ 133 ic_others_6               float64
+ 134 ic_others_7               float64
+ 135 ic_others_8               float64
+ 136 ic_others_9               float64
+ 137 total_rech_num_6          int64  
+ 138 total_rech_num_7          int64  
+ 139 total_rech_num_8          int64  
+ 140 total_rech_num_9          int64  
+ 141 total_rech_amt_6          int64  
+ 142 total_rech_amt_7          int64  
+ 143 total_rech_amt_8          int64  
+ 144 total_rech_amt_9          int64  
+ 145 max_rech_amt_6            int64  
+ 146 max_rech_amt_7            int64  
+ 147 max_rech_amt_8            int64  
+ 148 max_rech_amt_9            int64  
+ 149 date_of_last_rech_6       object 
+ 150 date_of_last_rech_7       object 
+ 151 date_of_last_rech_8       object 
+ 152 date_of_last_rech_9       object 
+ 153 last_day_rch_amt_6        int64  
+ 154 last_day_rch_amt_7        int64  
+ 155 last_day_rch_amt_8        int64  
+ 156 last_day_rch_amt_9        int64  
+ 157 date_of_last_rech_data_6  object 
+ 158 date_of_last_rech_data_7  object 
+ 159 date_of_last_rech_data_8  object 
+ 160 date_of_last_rech_data_9  object 
+ 161 total_rech_data_6         float64
+ 162 total_rech_data_7         float64
+ 163 total_rech_data_8         float64
+ 164 total_rech_data_9         float64
+ 165 max_rech_data_6           float64
+ 166 max_rech_data_7           float64
+ 167 max_rech_data_8           float64
+ 168 max_rech_data_9           float64
+ 169 count_rech_2g_6           float64
+ 170 count_rech_2g_7           float64
+ 171 count_rech_2g_8           float64
+ 172 count_rech_2g_9           float64
+ 173 count_rech_3g_6           float64
+ 174 count_rech_3g_7           float64
+ 175 count_rech_3g_8           float64
+ 176 count_rech_3g_9           float64
+ 177 av_rech_amt_data_6        float64
+ 178 av_rech_amt_data_7        float64
+ 179 av_rech_amt_data_8        float64
+ 180 av_rech_amt_data_9        float64
+ 181 vol_2g_mb_6               float64
+ 182 vol_2g_mb_7               float64
+ 183 vol_2g_mb_8               float64
+ 184 vol_2g_mb_9               float64
+ 185 vol_3g_mb_6               float64
+ 186 vol_3g_mb_7               float64
+ 187 vol_3g_mb_8               float64
+ 188 vol_3g_mb_9               float64
+ 189 arpu_3g_6                 float64
+ 190 arpu_3g_7                 float64
+ 191 arpu_3g_8                 float64
+ 192 arpu_3g_9                 float64
+ 193 arpu_2g_6                 float64
+ 194 arpu_2g_7                 float64
+ 195 arpu_2g_8                 float64
+ 196 arpu_2g_9                 float64
+ 197 night_pck_user_6          float64
+ 198 night_pck_user_7          float64
+ 199 night_pck_user_8          float64
+ 200 night_pck_user_9          float64
+ 201 monthly_2g_6              int64  
+ 202 monthly_2g_7              int64  
+ 203 monthly_2g_8              int64  
+ 204 monthly_2g_9              int64  
+ 205 sachet_2g_6               int64  
+ 206 sachet_2g_7               int64  
+ 207 sachet_2g_8               int64  
+ 208 sachet_2g_9               int64  
+ 209 monthly_3g_6              int64  
+ 210 monthly_3g_7              int64  
+ 211 monthly_3g_8              int64  
+ 212 monthly_3g_9              int64  
+ 213 sachet_3g_6               int64  
+ 214 sachet_3g_7               int64  
+ 215 sachet_3g_8               int64  
+ 216 sachet_3g_9               int64  
+ 217 fb_user_6                 float64
+ 218 fb_user_7                 float64
+ 219 fb_user_8                 float64
+ 220 fb_user_9                 float64
+ 221 aon                       int64  
+ 222 aug_vbc_3g                float64
+ 223 jul_vbc_3g                float64
+ 224 jun_vbc_3g                float64
+ 225 sep_vbc_3g                float64
+dtypes: float64(179), int64(35), object(12)
+memory usage: 172.4+ MB
+#Checking descriptive statistics
+data0.describe().T
+count	mean	std	min	25%	50%	75%	max
+mobile_number	99999.0	7.001207e+09	695669.386290	7.000000e+09	7.000606e+09	7.001205e+09	7.001812e+09	7.002411e+09
+circle_id	99999.0	1.090000e+02	0.000000	1.090000e+02	1.090000e+02	1.090000e+02	1.090000e+02	1.090000e+02
+loc_og_t2o_mou	98981.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_og_t2o_mou	98981.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+loc_ic_t2o_mou	98981.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+arpu_6	99999.0	2.829874e+02	328.439770	-2.258709e+03	9.341150e+01	1.977040e+02	3.710600e+02	2.773109e+04
+arpu_7	99999.0	2.785366e+02	338.156291	-2.014045e+03	8.698050e+01	1.916400e+02	3.653445e+02	3.514583e+04
+arpu_8	99999.0	2.791547e+02	344.474791	-9.458080e+02	8.412600e+01	1.920800e+02	3.693705e+02	3.354362e+04
+arpu_9	99999.0	2.616451e+02	341.998630	-1.899505e+03	6.268500e+01	1.768490e+02	3.534665e+02	3.880562e+04
+onnet_mou_6	96062.0	1.323959e+02	297.207406	0.000000e+00	7.380000e+00	3.431000e+01	1.187400e+02	7.376710e+03
+onnet_mou_7	96140.0	1.336708e+02	308.794148	0.000000e+00	6.660000e+00	3.233000e+01	1.155950e+02	8.157780e+03
+onnet_mou_8	94621.0	1.330181e+02	308.951589	0.000000e+00	6.460000e+00	3.236000e+01	1.158600e+02	1.075256e+04
+onnet_mou_9	92254.0	1.303023e+02	308.477668	0.000000e+00	5.330000e+00	2.984000e+01	1.121300e+02	1.042746e+04
+offnet_mou_6	96062.0	1.979356e+02	316.851613	0.000000e+00	3.473000e+01	9.631000e+01	2.318600e+02	8.362360e+03
+offnet_mou_7	96140.0	1.970451e+02	325.862803	0.000000e+00	3.219000e+01	9.173500e+01	2.268150e+02	9.667130e+03
+offnet_mou_8	94621.0	1.965748e+02	327.170662	0.000000e+00	3.163000e+01	9.214000e+01	2.282600e+02	1.400734e+04
+offnet_mou_9	92254.0	1.903372e+02	319.396092	0.000000e+00	2.713000e+01	8.729000e+01	2.205050e+02	1.031076e+04
+roam_ic_mou_6	96062.0	9.950013e+00	72.825411	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.372438e+04
+roam_ic_mou_7	96140.0	7.149898e+00	73.447948	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.537104e+04
+roam_ic_mou_8	94621.0	7.292981e+00	68.402466	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.309536e+04
+roam_ic_mou_9	92254.0	6.343841e+00	57.137537	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	8.464030e+03
+roam_og_mou_6	96062.0	1.391134e+01	71.443196	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.775110e+03
+roam_og_mou_7	96140.0	9.818732e+00	58.455762	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	2.812040e+03
+roam_og_mou_8	94621.0	9.971890e+00	64.713221	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.337040e+03
+roam_og_mou_9	92254.0	8.555519e+00	58.438186	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.428460e+03
+loc_og_t2t_mou_6	96062.0	4.710076e+01	150.856393	0.000000e+00	1.660000e+00	1.191000e+01	4.096000e+01	6.431330e+03
+loc_og_t2t_mou_7	96140.0	4.647301e+01	155.318705	0.000000e+00	1.630000e+00	1.161000e+01	3.991000e+01	7.400660e+03
+loc_og_t2t_mou_8	94621.0	4.588781e+01	151.184830	0.000000e+00	1.600000e+00	1.173000e+01	4.011000e+01	1.075256e+04
+loc_og_t2t_mou_9	92254.0	4.458445e+01	147.995390	0.000000e+00	1.360000e+00	1.126000e+01	3.928000e+01	1.038924e+04
+loc_og_t2m_mou_6	96062.0	9.334209e+01	162.780544	0.000000e+00	9.880000e+00	4.103000e+01	1.103900e+02	4.729740e+03
+loc_og_t2m_mou_7	96140.0	9.139713e+01	157.492308	0.000000e+00	1.002500e+01	4.043000e+01	1.075600e+02	4.557140e+03
+loc_og_t2m_mou_8	94621.0	9.175513e+01	156.537048	0.000000e+00	9.810000e+00	4.036000e+01	1.090900e+02	4.961330e+03
+loc_og_t2m_mou_9	92254.0	9.046319e+01	158.681454	0.000000e+00	8.810000e+00	3.912000e+01	1.068100e+02	4.429880e+03
+loc_og_t2f_mou_6	96062.0	3.751013e+00	14.230438	0.000000e+00	0.000000e+00	0.000000e+00	2.080000e+00	1.466030e+03
+loc_og_t2f_mou_7	96140.0	3.792985e+00	14.264986	0.000000e+00	0.000000e+00	0.000000e+00	2.090000e+00	1.196430e+03
+loc_og_t2f_mou_8	94621.0	3.677991e+00	13.270996	0.000000e+00	0.000000e+00	0.000000e+00	2.040000e+00	9.284900e+02
+loc_og_t2f_mou_9	92254.0	3.655123e+00	13.457549	0.000000e+00	0.000000e+00	0.000000e+00	1.940000e+00	9.274100e+02
+loc_og_t2c_mou_6	96062.0	1.123056e+00	5.448946	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.428600e+02
+loc_og_t2c_mou_7	96140.0	1.368500e+00	7.533445	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	9.162400e+02
+loc_og_t2c_mou_8	94621.0	1.433821e+00	6.783335	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.020900e+02
+loc_og_t2c_mou_9	92254.0	1.232726e+00	5.619021	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.398400e+02
+loc_og_mou_6	96062.0	1.442012e+02	251.751489	0.000000e+00	1.711000e+01	6.511000e+01	1.682700e+02	1.064338e+04
+loc_og_mou_7	96140.0	1.416705e+02	248.731086	0.000000e+00	1.748000e+01	6.368500e+01	1.643825e+02	7.674780e+03
+loc_og_mou_8	94621.0	1.413282e+02	245.914311	0.000000e+00	1.711000e+01	6.373000e+01	1.661100e+02	1.103991e+04
+loc_og_mou_9	92254.0	1.387100e+02	245.934517	0.000000e+00	1.556000e+01	6.184000e+01	1.622250e+02	1.109926e+04
+std_og_t2t_mou_6	96062.0	7.982987e+01	252.476533	0.000000e+00	0.000000e+00	0.000000e+00	3.080750e+01	7.366580e+03
+std_og_t2t_mou_7	96140.0	8.329960e+01	263.631042	0.000000e+00	0.000000e+00	0.000000e+00	3.113250e+01	8.133660e+03
+std_og_t2t_mou_8	94621.0	8.328267e+01	265.486090	0.000000e+00	0.000000e+00	0.000000e+00	3.058000e+01	8.014430e+03
+std_og_t2t_mou_9	92254.0	8.234292e+01	267.184991	0.000000e+00	0.000000e+00	0.000000e+00	2.823000e+01	9.382580e+03
+std_og_t2m_mou_6	96062.0	8.729962e+01	255.617850	0.000000e+00	0.000000e+00	3.950000e+00	5.329000e+01	8.314760e+03
+std_og_t2m_mou_7	96140.0	9.080414e+01	269.347911	0.000000e+00	0.000000e+00	3.635000e+00	5.404000e+01	9.284740e+03
+std_og_t2m_mou_8	94621.0	8.983839e+01	271.757783	0.000000e+00	0.000000e+00	3.310000e+00	5.249000e+01	1.395004e+04
+std_og_t2m_mou_9	92254.0	8.627662e+01	261.407396	0.000000e+00	0.000000e+00	2.500000e+00	4.856000e+01	1.022343e+04
+std_og_t2f_mou_6	96062.0	1.129011e+00	7.984970	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	6.285600e+02
+std_og_t2f_mou_7	96140.0	1.115010e+00	8.599406	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.446300e+02
+std_og_t2f_mou_8	94621.0	1.067792e+00	7.905971	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.169100e+02
+std_og_t2f_mou_9	92254.0	1.042362e+00	8.261770	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	8.084900e+02
+std_og_t2c_mou_6	96062.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_og_t2c_mou_7	96140.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_og_t2c_mou_8	94621.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_og_t2c_mou_9	92254.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_og_mou_6	96062.0	1.682612e+02	389.948499	0.000000e+00	0.000000e+00	1.164000e+01	1.448375e+02	8.432990e+03
+std_og_mou_7	96140.0	1.752214e+02	408.922934	0.000000e+00	0.000000e+00	1.109000e+01	1.506150e+02	1.093673e+04
+std_og_mou_8	94621.0	1.741915e+02	411.633049	0.000000e+00	0.000000e+00	1.041000e+01	1.479400e+02	1.398006e+04
+std_og_mou_9	92254.0	1.696645e+02	405.138658	0.000000e+00	0.000000e+00	8.410000e+00	1.421050e+02	1.149531e+04
+isd_og_mou_6	96062.0	7.982775e-01	25.765248	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.900660e+03
+isd_og_mou_7	96140.0	7.765721e-01	25.603052	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.490280e+03
+isd_og_mou_8	94621.0	7.912471e-01	25.544471	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.681540e+03
+isd_og_mou_9	92254.0	7.238921e-01	21.310751	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.244530e+03
+spl_og_mou_6	96062.0	3.916811e+00	14.936449	0.000000e+00	0.000000e+00	0.000000e+00	2.430000e+00	1.023210e+03
+spl_og_mou_7	96140.0	4.978279e+00	20.661570	0.000000e+00	0.000000e+00	0.000000e+00	3.710000e+00	2.372510e+03
+spl_og_mou_8	94621.0	5.053769e+00	17.855111	0.000000e+00	0.000000e+00	0.000000e+00	3.990000e+00	1.390880e+03
+spl_og_mou_9	92254.0	4.412767e+00	16.328227	0.000000e+00	0.000000e+00	0.000000e+00	3.230000e+00	1.635710e+03
+og_others_6	96062.0	4.541571e-01	4.125911	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	8.008900e+02
+og_others_7	96140.0	3.023539e-02	2.161717	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.701300e+02
+og_others_8	94621.0	3.337198e-02	2.323464	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.949300e+02
+og_others_9	92254.0	4.745572e-02	3.635466	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	7.877900e+02
+total_og_mou_6	99999.0	3.051334e+02	463.419481	0.000000e+00	4.474000e+01	1.451400e+02	3.728600e+02	1.067403e+04
+total_og_mou_7	99999.0	3.102312e+02	480.031178	0.000000e+00	4.301000e+01	1.415300e+02	3.785700e+02	1.136531e+04
+total_og_mou_8	99999.0	3.041195e+02	478.150031	0.000000e+00	3.858000e+01	1.386100e+02	3.699000e+02	1.404306e+04
+total_og_mou_9	99999.0	2.892792e+02	468.980002	0.000000e+00	2.551000e+01	1.254600e+02	3.534800e+02	1.151773e+04
+loc_ic_t2t_mou_6	96062.0	4.792237e+01	140.258485	0.000000e+00	2.990000e+00	1.569000e+01	4.684000e+01	6.626930e+03
+loc_ic_t2t_mou_7	96140.0	4.799052e+01	145.795055	0.000000e+00	3.230000e+00	1.574000e+01	4.581000e+01	9.324660e+03
+loc_ic_t2t_mou_8	94621.0	4.721136e+01	137.239552	0.000000e+00	3.280000e+00	1.603000e+01	4.629000e+01	1.069623e+04
+loc_ic_t2t_mou_9	92254.0	4.628179e+01	140.130610	0.000000e+00	3.290000e+00	1.566000e+01	4.518000e+01	1.059883e+04
+loc_ic_t2m_mou_6	96062.0	1.074757e+02	171.713903	0.000000e+00	1.729000e+01	5.649000e+01	1.323875e+02	4.693860e+03
+loc_ic_t2m_mou_7	96140.0	1.071205e+02	169.423620	0.000000e+00	1.859000e+01	5.708000e+01	1.309600e+02	4.455830e+03
+loc_ic_t2m_mou_8	94621.0	1.084605e+02	169.723759	0.000000e+00	1.893000e+01	5.824000e+01	1.339300e+02	6.274190e+03
+loc_ic_t2m_mou_9	92254.0	1.061555e+02	165.492803	0.000000e+00	1.856000e+01	5.661000e+01	1.304900e+02	5.463780e+03
+loc_ic_t2f_mou_6	96062.0	1.208430e+01	40.140895	0.000000e+00	0.000000e+00	8.800000e-01	8.140000e+00	1.872340e+03
+loc_ic_t2f_mou_7	96140.0	1.259970e+01	42.977442	0.000000e+00	0.000000e+00	9.300000e-01	8.282500e+00	1.983010e+03
+loc_ic_t2f_mou_8	94621.0	1.175183e+01	39.125379	0.000000e+00	0.000000e+00	9.300000e-01	8.110000e+00	2.433060e+03
+loc_ic_t2f_mou_9	92254.0	1.217310e+01	43.840776	0.000000e+00	0.000000e+00	9.600000e-01	8.140000e+00	4.318280e+03
+loc_ic_mou_6	96062.0	1.674911e+02	254.124029	0.000000e+00	3.039000e+01	9.216000e+01	2.080750e+02	7.454630e+03
+loc_ic_mou_7	96140.0	1.677195e+02	256.242707	0.000000e+00	3.246000e+01	9.255000e+01	2.058375e+02	9.669910e+03
+loc_ic_mou_8	94621.0	1.674326e+02	250.025523	0.000000e+00	3.274000e+01	9.383000e+01	2.072800e+02	1.083016e+04
+loc_ic_mou_9	92254.0	1.646193e+02	249.845070	0.000000e+00	3.229000e+01	9.164000e+01	2.027375e+02	1.079629e+04
+std_ic_t2t_mou_6	96062.0	9.575993e+00	54.330607	0.000000e+00	0.000000e+00	0.000000e+00	4.060000e+00	5.459560e+03
+std_ic_t2t_mou_7	96140.0	1.001190e+01	57.411971	0.000000e+00	0.000000e+00	0.000000e+00	4.230000e+00	5.800930e+03
+std_ic_t2t_mou_8	94621.0	9.883921e+00	55.073186	0.000000e+00	0.000000e+00	0.000000e+00	4.080000e+00	4.309290e+03
+std_ic_t2t_mou_9	92254.0	9.432479e+00	53.376273	0.000000e+00	0.000000e+00	0.000000e+00	3.510000e+00	3.819830e+03
+std_ic_t2m_mou_6	96062.0	2.072224e+01	80.793414	0.000000e+00	0.000000e+00	2.030000e+00	1.503000e+01	5.647160e+03
+std_ic_t2m_mou_7	96140.0	2.165641e+01	86.521393	0.000000e+00	0.000000e+00	2.040000e+00	1.574000e+01	6.141880e+03
+std_ic_t2m_mou_8	94621.0	2.118321e+01	83.683565	0.000000e+00	0.000000e+00	2.030000e+00	1.536000e+01	5.645860e+03
+std_ic_t2m_mou_9	92254.0	1.962091e+01	74.913050	0.000000e+00	0.000000e+00	1.740000e+00	1.426000e+01	5.689760e+03
+std_ic_t2f_mou_6	96062.0	2.156397e+00	16.495594	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.351110e+03
+std_ic_t2f_mou_7	96140.0	2.216923e+00	16.454061	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.136080e+03
+std_ic_t2f_mou_8	94621.0	2.085004e+00	15.812580	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.394890e+03
+std_ic_t2f_mou_9	92254.0	2.173419e+00	15.978601	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.431960e+03
+std_ic_t2o_mou_6	96062.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_ic_t2o_mou_7	96140.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_ic_t2o_mou_8	94621.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_ic_t2o_mou_9	92254.0	0.000000e+00	0.000000	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00
+std_ic_mou_6	96062.0	3.245718e+01	106.283386	0.000000e+00	0.000000e+00	5.890000e+00	2.693000e+01	5.712110e+03
+std_ic_mou_7	96140.0	3.388783e+01	113.720168	0.000000e+00	0.000000e+00	5.960000e+00	2.831000e+01	6.745760e+03
+std_ic_mou_8	94621.0	3.315474e+01	110.127008	0.000000e+00	1.000000e-02	5.880000e+00	2.771000e+01	5.957140e+03
+std_ic_mou_9	92254.0	3.122934e+01	101.982303	0.000000e+00	0.000000e+00	5.380000e+00	2.569000e+01	5.956660e+03
+total_ic_mou_6	99999.0	2.001300e+02	291.651671	0.000000e+00	3.853000e+01	1.147400e+02	2.516700e+02	7.716140e+03
+total_ic_mou_7	99999.0	2.028531e+02	298.124954	0.000000e+00	4.119000e+01	1.163400e+02	2.506600e+02	9.699010e+03
+total_ic_mou_8	99999.0	1.987508e+02	289.321094	0.000000e+00	3.829000e+01	1.146600e+02	2.489900e+02	1.083038e+04
+total_ic_mou_9	99999.0	1.892143e+02	284.823024	0.000000e+00	3.237000e+01	1.058900e+02	2.363200e+02	1.079659e+04
+spl_ic_mou_6	96062.0	6.155660e-02	0.160920	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.976000e+01
+spl_ic_mou_7	96140.0	3.358477e-02	0.155725	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	2.133000e+01
+spl_ic_mou_8	94621.0	4.036134e-02	0.146147	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.686000e+01
+spl_ic_mou_9	92254.0	1.631370e-01	0.527860	0.000000e+00	0.000000e+00	0.000000e+00	6.000000e-02	6.238000e+01
+isd_ic_mou_6	96062.0	7.460608e+00	59.722948	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	6.789410e+03
+isd_ic_mou_7	96140.0	8.334936e+00	65.219829	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.289540e+03
+isd_ic_mou_8	94621.0	8.442001e+00	63.813098	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.127010e+03
+isd_ic_mou_9	92254.0	8.063003e+00	63.505379	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.057740e+03
+ic_others_6	96062.0	8.546555e-01	11.955164	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.362940e+03
+ic_others_7	96140.0	1.012960e+00	12.673099	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.495940e+03
+ic_others_8	94621.0	9.708005e-01	13.284348	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	2.327510e+03
+ic_others_9	92254.0	1.017162e+00	12.381172	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.005230e+03
+total_rech_num_6	99999.0	7.558806e+00	7.078405	0.000000e+00	3.000000e+00	6.000000e+00	9.000000e+00	3.070000e+02
+total_rech_num_7	99999.0	7.700367e+00	7.070422	0.000000e+00	3.000000e+00	6.000000e+00	1.000000e+01	1.380000e+02
+total_rech_num_8	99999.0	7.212912e+00	7.203753	0.000000e+00	3.000000e+00	5.000000e+00	9.000000e+00	1.960000e+02
+total_rech_num_9	99999.0	6.893019e+00	7.096261	0.000000e+00	3.000000e+00	5.000000e+00	9.000000e+00	1.310000e+02
+total_rech_amt_6	99999.0	3.275146e+02	398.019701	0.000000e+00	1.090000e+02	2.300000e+02	4.375000e+02	3.519000e+04
+total_rech_amt_7	99999.0	3.229630e+02	408.114237	0.000000e+00	1.000000e+02	2.200000e+02	4.280000e+02	4.033500e+04
+total_rech_amt_8	99999.0	3.241571e+02	416.540455	0.000000e+00	9.000000e+01	2.250000e+02	4.345000e+02	4.532000e+04
+total_rech_amt_9	99999.0	3.033457e+02	404.588583	0.000000e+00	5.200000e+01	2.000000e+02	4.150000e+02	3.723500e+04
+max_rech_amt_6	99999.0	1.046375e+02	120.614894	0.000000e+00	3.000000e+01	1.100000e+02	1.200000e+02	4.010000e+03
+max_rech_amt_7	99999.0	1.047524e+02	124.523970	0.000000e+00	3.000000e+01	1.100000e+02	1.280000e+02	4.010000e+03
+max_rech_amt_8	99999.0	1.077282e+02	126.902505	0.000000e+00	3.000000e+01	9.800000e+01	1.440000e+02	4.449000e+03
+max_rech_amt_9	99999.0	1.019439e+02	125.375109	0.000000e+00	2.800000e+01	6.100000e+01	1.440000e+02	3.399000e+03
+last_day_rch_amt_6	99999.0	6.315625e+01	97.356649	0.000000e+00	0.000000e+00	3.000000e+01	1.100000e+02	4.010000e+03
+last_day_rch_amt_7	99999.0	5.938580e+01	95.915385	0.000000e+00	0.000000e+00	3.000000e+01	1.100000e+02	4.010000e+03
+last_day_rch_amt_8	99999.0	6.264172e+01	104.431816	0.000000e+00	0.000000e+00	3.000000e+01	1.300000e+02	4.449000e+03
+last_day_rch_amt_9	99999.0	4.390125e+01	90.809712	0.000000e+00	0.000000e+00	0.000000e+00	5.000000e+01	3.399000e+03
+total_rech_data_6	25153.0	2.463802e+00	2.789128	1.000000e+00	1.000000e+00	1.000000e+00	3.000000e+00	6.100000e+01
+total_rech_data_7	25571.0	2.666419e+00	3.031593	1.000000e+00	1.000000e+00	1.000000e+00	3.000000e+00	5.400000e+01
+total_rech_data_8	26339.0	2.651999e+00	3.074987	1.000000e+00	1.000000e+00	1.000000e+00	3.000000e+00	6.000000e+01
+total_rech_data_9	25922.0	2.441170e+00	2.516339	1.000000e+00	1.000000e+00	2.000000e+00	3.000000e+00	8.400000e+01
+max_rech_data_6	25153.0	1.263934e+02	108.477235	1.000000e+00	2.500000e+01	1.450000e+02	1.770000e+02	1.555000e+03
+max_rech_data_7	25571.0	1.267295e+02	109.765267	1.000000e+00	2.500000e+01	1.450000e+02	1.770000e+02	1.555000e+03
+max_rech_data_8	26339.0	1.257173e+02	109.437851	1.000000e+00	2.500000e+01	1.450000e+02	1.790000e+02	1.555000e+03
+max_rech_data_9	25922.0	1.249414e+02	111.363760	1.000000e+00	2.500000e+01	1.450000e+02	1.790000e+02	1.555000e+03
+count_rech_2g_6	25153.0	1.864668e+00	2.570254	0.000000e+00	1.000000e+00	1.000000e+00	2.000000e+00	4.200000e+01
+count_rech_2g_7	25571.0	2.044699e+00	2.768332	0.000000e+00	1.000000e+00	1.000000e+00	2.000000e+00	4.800000e+01
+count_rech_2g_8	26339.0	2.016288e+00	2.720132	0.000000e+00	1.000000e+00	1.000000e+00	2.000000e+00	4.400000e+01
+count_rech_2g_9	25922.0	1.781807e+00	2.214701	0.000000e+00	1.000000e+00	1.000000e+00	2.000000e+00	4.000000e+01
+count_rech_3g_6	25153.0	5.991333e-01	1.274428	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00	2.900000e+01
+count_rech_3g_7	25571.0	6.217199e-01	1.394524	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00	3.500000e+01
+count_rech_3g_8	26339.0	6.357113e-01	1.422827	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00	4.500000e+01
+count_rech_3g_9	25922.0	6.593627e-01	1.411513	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00	4.900000e+01
+av_rech_amt_data_6	25153.0	1.926010e+02	192.646318	1.000000e+00	8.200000e+01	1.540000e+02	2.520000e+02	7.546000e+03
+av_rech_amt_data_7	25571.0	2.009813e+02	196.791224	5.000000e-01	9.200000e+01	1.540000e+02	2.520000e+02	4.365000e+03
+av_rech_amt_data_8	26339.0	1.975265e+02	191.301305	5.000000e-01	8.700000e+01	1.540000e+02	2.520000e+02	4.076000e+03
+av_rech_amt_data_9	25922.0	1.927343e+02	188.400286	1.000000e+00	6.900000e+01	1.640000e+02	2.520000e+02	4.061000e+03
+vol_2g_mb_6	99999.0	5.190496e+01	213.356445	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.028590e+04
+vol_2g_mb_7	99999.0	5.122994e+01	212.302217	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	7.873550e+03
+vol_2g_mb_8	99999.0	5.017015e+01	212.347892	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.111761e+04
+vol_2g_mb_9	99999.0	4.471970e+01	198.653570	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	8.993950e+03
+vol_3g_mb_6	99999.0	1.213962e+02	544.247227	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.573540e+04
+vol_3g_mb_7	99999.0	1.289958e+02	541.494013	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	2.814412e+04
+vol_3g_mb_8	99999.0	1.354107e+02	558.775335	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.003606e+04
+vol_3g_mb_9	99999.0	1.360566e+02	577.394194	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.922127e+04
+arpu_3g_6	25153.0	8.955506e+01	193.124653	-3.082000e+01	0.000000e+00	4.800000e-01	1.220700e+02	6.362280e+03
+arpu_3g_7	25571.0	8.938412e+01	195.893924	-2.604000e+01	0.000000e+00	4.200000e-01	1.195600e+02	4.980900e+03
+arpu_3g_8	26339.0	9.117385e+01	188.180936	-2.449000e+01	0.000000e+00	8.800000e-01	1.220700e+02	3.716900e+03
+arpu_3g_9	25922.0	1.002641e+02	216.291992	-7.109000e+01	0.000000e+00	2.605000e+00	1.400100e+02	1.388431e+04
+arpu_2g_6	25153.0	8.639800e+01	172.767523	-3.583000e+01	0.000000e+00	1.083000e+01	1.220700e+02	6.433760e+03
+arpu_2g_7	25571.0	8.591445e+01	176.379871	-1.548000e+01	0.000000e+00	8.810000e+00	1.220700e+02	4.809360e+03
+arpu_2g_8	26339.0	8.659948e+01	168.247852	-5.583000e+01	0.000000e+00	9.270000e+00	1.220700e+02	3.483170e+03
+arpu_2g_9	25922.0	9.371203e+01	171.384224	-4.574000e+01	0.000000e+00	1.480000e+01	1.400100e+02	3.467170e+03
+night_pck_user_6	25153.0	2.508647e-02	0.156391	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00
+night_pck_user_7	25571.0	2.303391e-02	0.150014	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00
+night_pck_user_8	26339.0	2.084362e-02	0.142863	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00
+night_pck_user_9	25922.0	1.597099e-02	0.125366	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.000000e+00
+monthly_2g_6	99999.0	7.964080e-02	0.295058	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.000000e+00
+monthly_2g_7	99999.0	8.322083e-02	0.304395	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.000000e+00
+monthly_2g_8	99999.0	8.100081e-02	0.299568	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	5.000000e+00
+monthly_2g_9	99999.0	6.878069e-02	0.278120	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.000000e+00
+sachet_2g_6	99999.0	3.893839e-01	1.497320	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.200000e+01
+sachet_2g_7	99999.0	4.396344e-01	1.636230	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.800000e+01
+sachet_2g_8	99999.0	4.500745e-01	1.630263	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.400000e+01
+sachet_2g_9	99999.0	3.931039e-01	1.347140	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.000000e+01
+monthly_3g_6	99999.0	7.592076e-02	0.363371	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.400000e+01
+monthly_3g_7	99999.0	7.858079e-02	0.387231	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.600000e+01
+monthly_3g_8	99999.0	8.294083e-02	0.384947	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.600000e+01
+monthly_3g_9	99999.0	8.634086e-02	0.384978	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.100000e+01
+sachet_3g_6	99999.0	7.478075e-02	0.568344	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	2.900000e+01
+sachet_3g_7	99999.0	8.040080e-02	0.628334	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	3.500000e+01
+sachet_3g_8	99999.0	8.450085e-02	0.660234	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.100000e+01
+sachet_3g_9	99999.0	8.458085e-02	0.650457	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	4.900000e+01
+fb_user_6	25153.0	9.144038e-01	0.279772	0.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00
+fb_user_7	25571.0	9.087638e-01	0.287950	0.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00
+fb_user_8	26339.0	8.908083e-01	0.311885	0.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00
+fb_user_9	25922.0	8.609675e-01	0.345987	0.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00	1.000000e+00
+aon	99999.0	1.219855e+03	954.733842	1.800000e+02	4.670000e+02	8.630000e+02	1.807500e+03	4.337000e+03
+aug_vbc_3g	99999.0	6.817025e+01	267.580450	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.291622e+04
+jul_vbc_3g	99999.0	6.683906e+01	271.201856	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	9.165600e+03
+jun_vbc_3g	99999.0	6.002120e+01	253.938223	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	1.116621e+04
+sep_vbc_3g	99999.0	3.299373e+00	32.408353	0.000000e+00	0.000000e+00	0.000000e+00	0.000000e+00	2.618570e+03
+Explaining dataset
+After eyeballing and exploring the data, we can categorize 226 different attributes into below categories:
+
+mobile_number
+circle_id
+aon : days on network
+31*4= 124 mou (Minutes of Usage) columns for 4 months and 3 consolidated columns (loc_og_t2o_mou, std_og_t2o_mou, loc_ic_t2o_mou)
+12 date columns related to different last recharges for 4 different months
+12 arpu (Average Revenue Per User) columns across different segments for 4 different months
+36 columns contains information about different recharges done by the user for each of these 4 months: total_rech_num_* (no. of total recharges), total_rech_amt_* (amount of total recharge), total_rech_data_* (no. of total data recharges (2g + 3g), max_rech_data_* (maximum amount of data recharge), av_rech_amt_data_* (average amount of each data recharge), count_rech_2g/3g_* (count of 2g and 3g recharges in each month), last_day_rch_amt_* (last recharge amount by the user)
+8 vol_* columns have information of consumed 2g and 3g data volume by the user for each 4 months.
+4 *_vbc_3g contains info about volume based 3g consumption by the users.
+4 night_pck_user_* categorical features contain if a user has active night pack for a month.
+16 sachet_* and monthly_* columns have information about the no. of monthly/sachet packs used by users.
+4 fb_user_* categorical features contain if a user has fb service activated or not.
+Data pre-processing
+# Checking for duplicate entry
+data0['mobile_number'].duplicated().any()
+False
+# Checking % of missing values
+round(data0.isnull().sum()/ data0.shape[0], 2)
+mobile_number               0.00
+circle_id                   0.00
+loc_og_t2o_mou              0.01
+std_og_t2o_mou              0.01
+loc_ic_t2o_mou              0.01
+last_date_of_month_6        0.00
+last_date_of_month_7        0.01
+last_date_of_month_8        0.01
+last_date_of_month_9        0.02
+arpu_6                      0.00
+arpu_7                      0.00
+arpu_8                      0.00
+arpu_9                      0.00
+onnet_mou_6                 0.04
+onnet_mou_7                 0.04
+onnet_mou_8                 0.05
+onnet_mou_9                 0.08
+offnet_mou_6                0.04
+offnet_mou_7                0.04
+offnet_mou_8                0.05
+offnet_mou_9                0.08
+roam_ic_mou_6               0.04
+roam_ic_mou_7               0.04
+roam_ic_mou_8               0.05
+roam_ic_mou_9               0.08
+roam_og_mou_6               0.04
+roam_og_mou_7               0.04
+roam_og_mou_8               0.05
+roam_og_mou_9               0.08
+loc_og_t2t_mou_6            0.04
+loc_og_t2t_mou_7            0.04
+loc_og_t2t_mou_8            0.05
+loc_og_t2t_mou_9            0.08
+loc_og_t2m_mou_6            0.04
+loc_og_t2m_mou_7            0.04
+loc_og_t2m_mou_8            0.05
+loc_og_t2m_mou_9            0.08
+loc_og_t2f_mou_6            0.04
+loc_og_t2f_mou_7            0.04
+loc_og_t2f_mou_8            0.05
+loc_og_t2f_mou_9            0.08
+loc_og_t2c_mou_6            0.04
+loc_og_t2c_mou_7            0.04
+loc_og_t2c_mou_8            0.05
+loc_og_t2c_mou_9            0.08
+loc_og_mou_6                0.04
+loc_og_mou_7                0.04
+loc_og_mou_8                0.05
+loc_og_mou_9                0.08
+std_og_t2t_mou_6            0.04
+std_og_t2t_mou_7            0.04
+std_og_t2t_mou_8            0.05
+std_og_t2t_mou_9            0.08
+std_og_t2m_mou_6            0.04
+std_og_t2m_mou_7            0.04
+std_og_t2m_mou_8            0.05
+std_og_t2m_mou_9            0.08
+std_og_t2f_mou_6            0.04
+std_og_t2f_mou_7            0.04
+std_og_t2f_mou_8            0.05
+std_og_t2f_mou_9            0.08
+std_og_t2c_mou_6            0.04
+std_og_t2c_mou_7            0.04
+std_og_t2c_mou_8            0.05
+std_og_t2c_mou_9            0.08
+std_og_mou_6                0.04
+std_og_mou_7                0.04
+std_og_mou_8                0.05
+std_og_mou_9                0.08
+isd_og_mou_6                0.04
+isd_og_mou_7                0.04
+isd_og_mou_8                0.05
+isd_og_mou_9                0.08
+spl_og_mou_6                0.04
+spl_og_mou_7                0.04
+spl_og_mou_8                0.05
+spl_og_mou_9                0.08
+og_others_6                 0.04
+og_others_7                 0.04
+og_others_8                 0.05
+og_others_9                 0.08
+total_og_mou_6              0.00
+total_og_mou_7              0.00
+total_og_mou_8              0.00
+total_og_mou_9              0.00
+loc_ic_t2t_mou_6            0.04
+loc_ic_t2t_mou_7            0.04
+loc_ic_t2t_mou_8            0.05
+loc_ic_t2t_mou_9            0.08
+loc_ic_t2m_mou_6            0.04
+loc_ic_t2m_mou_7            0.04
+loc_ic_t2m_mou_8            0.05
+loc_ic_t2m_mou_9            0.08
+loc_ic_t2f_mou_6            0.04
+loc_ic_t2f_mou_7            0.04
+loc_ic_t2f_mou_8            0.05
+loc_ic_t2f_mou_9            0.08
+loc_ic_mou_6                0.04
+loc_ic_mou_7                0.04
+loc_ic_mou_8                0.05
+loc_ic_mou_9                0.08
+std_ic_t2t_mou_6            0.04
+std_ic_t2t_mou_7            0.04
+std_ic_t2t_mou_8            0.05
+std_ic_t2t_mou_9            0.08
+std_ic_t2m_mou_6            0.04
+std_ic_t2m_mou_7            0.04
+std_ic_t2m_mou_8            0.05
+std_ic_t2m_mou_9            0.08
+std_ic_t2f_mou_6            0.04
+std_ic_t2f_mou_7            0.04
+std_ic_t2f_mou_8            0.05
+std_ic_t2f_mou_9            0.08
+std_ic_t2o_mou_6            0.04
+std_ic_t2o_mou_7            0.04
+std_ic_t2o_mou_8            0.05
+std_ic_t2o_mou_9            0.08
+std_ic_mou_6                0.04
+std_ic_mou_7                0.04
+std_ic_mou_8                0.05
+std_ic_mou_9                0.08
+total_ic_mou_6              0.00
+total_ic_mou_7              0.00
+total_ic_mou_8              0.00
+total_ic_mou_9              0.00
+spl_ic_mou_6                0.04
+spl_ic_mou_7                0.04
+spl_ic_mou_8                0.05
+spl_ic_mou_9                0.08
+isd_ic_mou_6                0.04
+isd_ic_mou_7                0.04
+isd_ic_mou_8                0.05
+isd_ic_mou_9                0.08
+ic_others_6                 0.04
+ic_others_7                 0.04
+ic_others_8                 0.05
+ic_others_9                 0.08
+total_rech_num_6            0.00
+total_rech_num_7            0.00
+total_rech_num_8            0.00
+total_rech_num_9            0.00
+total_rech_amt_6            0.00
+total_rech_amt_7            0.00
+total_rech_amt_8            0.00
+total_rech_amt_9            0.00
+max_rech_amt_6              0.00
+max_rech_amt_7              0.00
+max_rech_amt_8              0.00
+max_rech_amt_9              0.00
+date_of_last_rech_6         0.02
+date_of_last_rech_7         0.02
+date_of_last_rech_8         0.04
+date_of_last_rech_9         0.05
+last_day_rch_amt_6          0.00
+last_day_rch_amt_7          0.00
+last_day_rch_amt_8          0.00
+last_day_rch_amt_9          0.00
+date_of_last_rech_data_6    0.75
+date_of_last_rech_data_7    0.74
+date_of_last_rech_data_8    0.74
+date_of_last_rech_data_9    0.74
+total_rech_data_6           0.75
+total_rech_data_7           0.74
+total_rech_data_8           0.74
+total_rech_data_9           0.74
+max_rech_data_6             0.75
+max_rech_data_7             0.74
+max_rech_data_8             0.74
+max_rech_data_9             0.74
+count_rech_2g_6             0.75
+count_rech_2g_7             0.74
+count_rech_2g_8             0.74
+count_rech_2g_9             0.74
+count_rech_3g_6             0.75
+count_rech_3g_7             0.74
+count_rech_3g_8             0.74
+count_rech_3g_9             0.74
+av_rech_amt_data_6          0.75
+av_rech_amt_data_7          0.74
+av_rech_amt_data_8          0.74
+av_rech_amt_data_9          0.74
+vol_2g_mb_6                 0.00
+vol_2g_mb_7                 0.00
+vol_2g_mb_8                 0.00
+vol_2g_mb_9                 0.00
+vol_3g_mb_6                 0.00
+vol_3g_mb_7                 0.00
+vol_3g_mb_8                 0.00
+vol_3g_mb_9                 0.00
+arpu_3g_6                   0.75
+arpu_3g_7                   0.74
+arpu_3g_8                   0.74
+arpu_3g_9                   0.74
+arpu_2g_6                   0.75
+arpu_2g_7                   0.74
+arpu_2g_8                   0.74
+arpu_2g_9                   0.74
+night_pck_user_6            0.75
+night_pck_user_7            0.74
+night_pck_user_8            0.74
+night_pck_user_9            0.74
+monthly_2g_6                0.00
+monthly_2g_7                0.00
+monthly_2g_8                0.00
+monthly_2g_9                0.00
+sachet_2g_6                 0.00
+sachet_2g_7                 0.00
+sachet_2g_8                 0.00
+sachet_2g_9                 0.00
+monthly_3g_6                0.00
+monthly_3g_7                0.00
+monthly_3g_8                0.00
+monthly_3g_9                0.00
+sachet_3g_6                 0.00
+sachet_3g_7                 0.00
+sachet_3g_8                 0.00
+sachet_3g_9                 0.00
+fb_user_6                   0.75
+fb_user_7                   0.74
+fb_user_8                   0.74
+fb_user_9                   0.74
+aon                         0.00
+aug_vbc_3g                  0.00
+jul_vbc_3g                  0.00
+jun_vbc_3g                  0.00
+sep_vbc_3g                  0.00
+dtype: float64
+There are 39 columns having missing data > 70%. We'll analyze thes
+
+Missing Value Analysis (MCAR, MAR, MNAR)
+We'll perform missing value analysis to understand if observed missing values in different columns are MCAR, MAR or MNAR. We'll start with the assumption that missing values in diffrent columns are MAR and will try to establish the assumption. At this stage we'll only impute missing values with business knowledge only. We'll not perform any kind of statistical imputation at this stage.
+
+Analysing missing values in date_of_last_rech_* and total_rech_data_*
+Assumption: We can assume that Null values in date_of_last_rech_* columns are denoting that the customer has not recharged in that month. Then for those datapoints total_rech_data_, av_rech_amt_data_, max_rech_data_* columns also should have Null values. If these 4 types of columns have null values for exact indexes, then we can consider our assumption as True and can impute missing values in total_rech_data_, av_rech_amt_data_, max_rech_data_* columns with 0.
+
+# Comparing index of missing values across all 4 column types
+
+check1= ((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.total_rech_data_6.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.av_rech_amt_data_6.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.max_rech_data_6.isnull()].index).all())
+
+check2= ((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.total_rech_data_7.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.av_rech_amt_data_7.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.max_rech_data_7.isnull()].index).all())
+
+check3= ((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.total_rech_data_8.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.av_rech_amt_data_8.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.max_rech_data_8.isnull()].index).all())
+
+check4= ((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.total_rech_data_9.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.av_rech_amt_data_9.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.max_rech_data_9.isnull()].index).all())
+
+if check1 & check2 & check3 & check4:
+    print('Assumption is True, We can impute missing values in total_rech_data_*, av_rech_amt_data_*, max_rech_data_* columns \
+          with 0 ')
+Assumption is True, We can impute missing values in total_rech_data_*, av_rech_amt_data_*, max_rech_data_* columns           with 0 
+# Imputing missing values in total_rech_data_*, av_rech_amt_data_*, max_rech_data_* columns
+
+cols1= ['total_rech_data_6', 'av_rech_amt_data_6', 'max_rech_data_6', 
+                    'total_rech_data_7', 'av_rech_amt_data_7', 'max_rech_data_7', 
+                    'total_rech_data_8', 'av_rech_amt_data_8', 'max_rech_data_8',
+                    'total_rech_data_9', 'av_rech_amt_data_9', 'max_rech_data_9']
+
+for col in cols1:
+    data0[col].fillna(0, inplace= True)
+
+
+data0[cols1].isna().sum()
+total_rech_data_6     0
+av_rech_amt_data_6    0
+max_rech_data_6       0
+total_rech_data_7     0
+av_rech_amt_data_7    0
+max_rech_data_7       0
+total_rech_data_8     0
+av_rech_amt_data_8    0
+max_rech_data_8       0
+total_rech_data_9     0
+av_rech_amt_data_9    0
+max_rech_data_9       0
+dtype: int64
+Analysing missing values in arpu_2g_, arpu_3g_, count_rech_2g_, count_rech_3g_ and night_pck_user_*
+# Checking value_counts
+data0.night_pck_user_6.value_counts(dropna= False)
+NaN    74846
+0.0    24522
+1.0      631
+Name: night_pck_user_6, dtype: int64
+Assumption: We'll again check if arpu_2g_, arpu_3g_, count_rech_2g_, count_rech_3g_ and night_pck_user_* columns have missing values only for those observations for which date_of_last_rech_data_* for that corresponsing month is also missing. If above statement is True, then we can impute these missing values with 0. Again for night_pck_user_ it can be seen to prominent categories 0 : Customers not having night packs, 1: customers having night packs. NaN may signify that the customer is not making any call during night, means an Inactive customer.
+
+# Comparing index of missing values across all 5 column types
+
+check1= ((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.arpu_2g_6.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.arpu_3g_6.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.night_pck_user_6.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.count_rech_2g_6.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.count_rech_3g_6.isnull()].index).all())
+
+check2= ((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.arpu_2g_7.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.arpu_3g_7.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.night_pck_user_7.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.count_rech_2g_7.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.count_rech_3g_7.isnull()].index).all())
+
+check3= ((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.arpu_2g_8.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.arpu_3g_8.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.night_pck_user_8.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.count_rech_2g_8.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.count_rech_3g_8.isnull()].index).all())
+
+check4= ((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.arpu_2g_9.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.arpu_3g_9.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.night_pck_user_9.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.count_rech_2g_9.isnull()].index).all()) & \
+((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.count_rech_3g_9.isnull()].index).all())
+
+
+if check1 & check2 & check3 & check4:
+    print('Assumption is True, We can impute missing values in arpu_*, night_pck_user_* columns with 0 ')
+Assumption is True, We can impute missing values in arpu_*, night_pck_user_* columns with 0 
+# Imputing missing values in arpu_2g_*, arpu_3g_*, night_pck_user_* columns
+
+cols2= ['arpu_2g_6', 'arpu_2g_7', 'arpu_2g_8', 'arpu_2g_9', 'arpu_3g_6', 'arpu_3g_7', 'arpu_3g_8', 'arpu_3g_9',
+       'night_pck_user_6', 'night_pck_user_7', 'night_pck_user_8', 'night_pck_user_9', 'count_rech_2g_6', 'count_rech_3g_6',
+       'count_rech_2g_7', 'count_rech_3g_7', 'count_rech_2g_8', 'count_rech_3g_8', 'count_rech_2g_9', 'count_rech_3g_9',]
+
+
+for col in cols2:
+    data0[col].fillna(0, inplace= True)
+
+
+data0[cols2].isna().sum()
+arpu_2g_6           0
+arpu_2g_7           0
+arpu_2g_8           0
+arpu_2g_9           0
+arpu_3g_6           0
+arpu_3g_7           0
+arpu_3g_8           0
+arpu_3g_9           0
+night_pck_user_6    0
+night_pck_user_7    0
+night_pck_user_8    0
+night_pck_user_9    0
+count_rech_2g_6     0
+count_rech_3g_6     0
+count_rech_2g_7     0
+count_rech_3g_7     0
+count_rech_2g_8     0
+count_rech_3g_8     0
+count_rech_2g_9     0
+count_rech_3g_9     0
+dtype: int64
+Analysing missing values fb_user_* columns
+# Checking value_counts()
+data0.fb_user_6.value_counts(dropna= False)
+NaN    74846
+1.0    23000
+0.0     2153
+Name: fb_user_6, dtype: int64
+Assumption: Checking if fb_user_* columns have missing values only for those observations for which date_of_last_rech_data_* for that corresponsing month is missing. If above statement is True, then we can impute these missing values with 0.
+
+# Comparing index of missing values for fb_user_* columns
+
+check1= ((data0[data0.date_of_last_rech_data_6.isnull()].index == data0[data0.fb_user_6.isnull()].index).all())
+check2= ((data0[data0.date_of_last_rech_data_7.isnull()].index == data0[data0.fb_user_7.isnull()].index).all())
+check3= ((data0[data0.date_of_last_rech_data_8.isnull()].index == data0[data0.fb_user_8.isnull()].index).all())
+check4= ((data0[data0.date_of_last_rech_data_9.isnull()].index == data0[data0.fb_user_9.isnull()].index).all())
+
+if check1 & check2 & check3 & check4:
+    print('Assumption is True, We can impute missing values in fb_user_* columns with 0 ')
+Assumption is True, We can impute missing values in fb_user_* columns with 0 
+# Imputing missing values in total_rech_data_, av_rech_amt_data_, max_rech_data_* columns
+
+cols3= ['fb_user_6', 'fb_user_7', 'fb_user_8', 'fb_user_9']
+
+
+for col in cols3:
+    data0[col].fillna(0, inplace= True)
+
+
+data0[cols3].isna().sum()
+fb_user_6    0
+fb_user_7    0
+fb_user_8    0
+fb_user_9    0
+dtype: int64
+# Checking columns having missing values 
+round(data0.isnull().sum()/ data0.shape[0], 2).sort_values(ascending= False)
+date_of_last_rech_data_6    0.75
+date_of_last_rech_data_7    0.74
+date_of_last_rech_data_8    0.74
+date_of_last_rech_data_9    0.74
+std_ic_t2f_mou_9            0.08
+std_ic_mou_9                0.08
+std_ic_t2m_mou_9            0.08
+loc_og_t2t_mou_9            0.08
+loc_og_t2m_mou_9            0.08
+loc_og_t2f_mou_9            0.08
+loc_og_t2c_mou_9            0.08
+std_ic_t2o_mou_9            0.08
+loc_og_mou_9                0.08
+std_og_t2t_mou_9            0.08
+std_og_t2f_mou_9            0.08
+og_others_9                 0.08
+std_og_t2m_mou_9            0.08
+roam_ic_mou_9               0.08
+spl_ic_mou_9                0.08
+std_og_t2c_mou_9            0.08
+isd_ic_mou_9                0.08
+std_og_mou_9                0.08
+isd_og_mou_9                0.08
+ic_others_9                 0.08
+roam_og_mou_9               0.08
+spl_og_mou_9                0.08
+loc_ic_t2m_mou_9            0.08
+onnet_mou_9                 0.08
+loc_ic_mou_9                0.08
+std_ic_t2t_mou_9            0.08
+loc_ic_t2t_mou_9            0.08
+loc_ic_t2f_mou_9            0.08
+offnet_mou_9                0.08
+std_og_t2m_mou_8            0.05
+onnet_mou_8                 0.05
+loc_ic_mou_8                0.05
+std_og_t2f_mou_8            0.05
+spl_ic_mou_8                0.05
+std_og_t2c_mou_8            0.05
+loc_ic_t2f_mou_8            0.05
+std_og_mou_8                0.05
+loc_ic_t2m_mou_8            0.05
+std_ic_mou_8                0.05
+date_of_last_rech_9         0.05
+isd_ic_mou_8                0.05
+ic_others_8                 0.05
+isd_og_mou_8                0.05
+loc_ic_t2t_mou_8            0.05
+og_others_8                 0.05
+spl_og_mou_8                0.05
+std_og_t2t_mou_8            0.05
+std_ic_t2o_mou_8            0.05
+std_ic_t2f_mou_8            0.05
+offnet_mou_8                0.05
+roam_og_mou_8               0.05
+roam_ic_mou_8               0.05
+std_ic_t2m_mou_8            0.05
+loc_og_t2t_mou_8            0.05
+std_ic_t2t_mou_8            0.05
+loc_og_mou_8                0.05
+loc_og_t2f_mou_8            0.05
+loc_og_t2m_mou_8            0.05
+loc_og_t2c_mou_8            0.05
+std_ic_t2f_mou_7            0.04
+std_ic_mou_7                0.04
+loc_ic_t2m_mou_7            0.04
+ic_others_6                 0.04
+isd_ic_mou_7                0.04
+ic_others_7                 0.04
+std_ic_t2f_mou_6            0.04
+loc_ic_t2m_mou_6            0.04
+std_ic_t2o_mou_6            0.04
+isd_ic_mou_6                0.04
+loc_ic_t2f_mou_6            0.04
+loc_ic_t2f_mou_7            0.04
+std_ic_t2o_mou_7            0.04
+og_others_7                 0.04
+loc_ic_mou_6                0.04
+std_ic_t2t_mou_7            0.04
+spl_ic_mou_7                0.04
+spl_ic_mou_6                0.04
+loc_ic_mou_7                0.04
+std_ic_t2m_mou_7            0.04
+std_ic_t2t_mou_6            0.04
+std_ic_mou_6                0.04
+std_ic_t2m_mou_6            0.04
+std_og_mou_6                0.04
+og_others_6                 0.04
+loc_og_mou_7                0.04
+loc_og_t2c_mou_7            0.04
+loc_og_t2c_mou_6            0.04
+loc_og_t2f_mou_7            0.04
+spl_og_mou_7                0.04
+loc_og_t2f_mou_6            0.04
+loc_og_t2m_mou_7            0.04
+loc_og_t2m_mou_6            0.04
+loc_og_t2t_mou_7            0.04
+loc_og_t2t_mou_6            0.04
+roam_og_mou_7               0.04
+roam_og_mou_6               0.04
+roam_ic_mou_7               0.04
+roam_ic_mou_6               0.04
+offnet_mou_7                0.04
+offnet_mou_6                0.04
+onnet_mou_7                 0.04
+onnet_mou_6                 0.04
+loc_og_mou_6                0.04
+loc_ic_t2t_mou_7            0.04
+std_og_t2t_mou_6            0.04
+std_og_t2c_mou_6            0.04
+spl_og_mou_6                0.04
+isd_og_mou_7                0.04
+std_og_t2t_mou_7            0.04
+date_of_last_rech_8         0.04
+std_og_mou_7                0.04
+loc_ic_t2t_mou_6            0.04
+std_og_t2c_mou_7            0.04
+isd_og_mou_6                0.04
+std_og_t2f_mou_7            0.04
+std_og_t2m_mou_7            0.04
+std_og_t2m_mou_6            0.04
+std_og_t2f_mou_6            0.04
+date_of_last_rech_7         0.02
+date_of_last_rech_6         0.02
+last_date_of_month_9        0.02
+last_date_of_month_8        0.01
+loc_og_t2o_mou              0.01
+std_og_t2o_mou              0.01
+loc_ic_t2o_mou              0.01
+last_date_of_month_7        0.01
+circle_id                   0.00
+last_date_of_month_6        0.00
+arpu_7                      0.00
+arpu_6                      0.00
+arpu_8                      0.00
+arpu_9                      0.00
+total_og_mou_8              0.00
+total_og_mou_7              0.00
+total_og_mou_6              0.00
+total_og_mou_9              0.00
+sep_vbc_3g                  0.00
+jun_vbc_3g                  0.00
+arpu_2g_7                   0.00
+monthly_2g_7                0.00
+monthly_2g_6                0.00
+night_pck_user_9            0.00
+night_pck_user_8            0.00
+night_pck_user_7            0.00
+night_pck_user_6            0.00
+arpu_2g_9                   0.00
+arpu_2g_8                   0.00
+arpu_2g_6                   0.00
+vol_2g_mb_8                 0.00
+arpu_3g_9                   0.00
+arpu_3g_8                   0.00
+arpu_3g_7                   0.00
+arpu_3g_6                   0.00
+vol_3g_mb_9                 0.00
+vol_3g_mb_8                 0.00
+vol_3g_mb_7                 0.00
+vol_3g_mb_6                 0.00
+monthly_2g_8                0.00
+monthly_2g_9                0.00
+sachet_2g_6                 0.00
+sachet_2g_7                 0.00
+jul_vbc_3g                  0.00
+aug_vbc_3g                  0.00
+aon                         0.00
+fb_user_9                   0.00
+fb_user_8                   0.00
+fb_user_7                   0.00
+fb_user_6                   0.00
+sachet_3g_9                 0.00
+sachet_3g_8                 0.00
+sachet_3g_7                 0.00
+sachet_3g_6                 0.00
+monthly_3g_9                0.00
+monthly_3g_8                0.00
+monthly_3g_7                0.00
+monthly_3g_6                0.00
+sachet_2g_9                 0.00
+sachet_2g_8                 0.00
+vol_2g_mb_9                 0.00
+vol_2g_mb_7                 0.00
+total_ic_mou_6              0.00
+total_rech_amt_8            0.00
+last_day_rch_amt_8          0.00
+last_day_rch_amt_7          0.00
+last_day_rch_amt_6          0.00
+max_rech_amt_9              0.00
+max_rech_amt_8              0.00
+max_rech_amt_7              0.00
+max_rech_amt_6              0.00
+total_rech_amt_9            0.00
+total_rech_amt_7            0.00
+vol_2g_mb_6                 0.00
+total_rech_amt_6            0.00
+total_rech_num_9            0.00
+total_rech_num_8            0.00
+total_rech_num_7            0.00
+total_rech_num_6            0.00
+total_ic_mou_9              0.00
+total_ic_mou_8              0.00
+total_ic_mou_7              0.00
+last_day_rch_amt_9          0.00
+total_rech_data_6           0.00
+total_rech_data_7           0.00
+total_rech_data_8           0.00
+av_rech_amt_data_9          0.00
+av_rech_amt_data_8          0.00
+av_rech_amt_data_7          0.00
+av_rech_amt_data_6          0.00
+count_rech_3g_9             0.00
+count_rech_3g_8             0.00
+count_rech_3g_7             0.00
+count_rech_3g_6             0.00
+count_rech_2g_9             0.00
+count_rech_2g_8             0.00
+count_rech_2g_7             0.00
+count_rech_2g_6             0.00
+max_rech_data_9             0.00
+max_rech_data_8             0.00
+max_rech_data_7             0.00
+max_rech_data_6             0.00
+total_rech_data_9           0.00
+mobile_number               0.00
+dtype: float64
+There are 29 x 4= 116 incoming and outgoing call minutes of usage columns (*mou_* columns, og_others* and ic_others_*) where we can see missing values are present. It's very tiresome activity to tally indexes of all these columns to confirm our assumption that these missing values are MAR. We'll use missingno package to see the correlation heatmap of missing values for these columns one by one for each month. If we get correlation of 1, then we can say these are MAR, these missing values have an observed relation with missing values in other columns. Then we will **compare any one of these columns with total_og_mou_* (total outgoing minutes in a moth) and total_ic_mou_* (total incoming minutes in a month).** If observations with missing values in this one representative column also have 0 value in both total_og_mou and total_ic_mou columns for the corresponding month then we can conclude that: As total incoming and outgoing mou is zero in that month, so any sub-class values for that month will also be 0. So, if assumption is True then we can impute missing values in all these columns with 0.
+
+# Checking correlation of missing values between all *_mou6 columns
+msno.heatmap(data0.loc[:, data0.columns.str.endswith(('mou_6', '_others_6', 'total_og_mou_6'))])
+<matplotlib.axes._subplots.AxesSubplot at 0x7f07592dbcd0>
+
+# Checking correlation of missing values between all *_mo7 columns
+msno.heatmap(data0.loc[:, data0.columns.str.endswith(('mou_7', '_others_7'))])
+<matplotlib.axes._subplots.AxesSubplot at 0x7f0758ffce50>
+
+# Checking correlation of missing values between all *_mou8 columns
+msno.heatmap(data0.loc[:, data0.columns.str.endswith(('mou_8', '_others_8'))])
+<matplotlib.axes._subplots.AxesSubplot at 0x7f07596591d0>
+
+# Checking correlation of missing values between all *_mou9 columns
+msno.heatmap(data0.loc[:, data0.columns.str.endswith(('mou_9', '_others_9'))])
+<matplotlib.axes._subplots.AxesSubplot at 0x7f0758a52890>
+
+# Getting indexes of observations for which onnet_mou_* is missing for month 6,7,8,9
+ind6= data0[data0.onnet_mou_6.isna()].index
+ind7= data0[data0.onnet_mou_7.isna()].index
+ind8= data0[data0.onnet_mou_8.isna()].index
+ind9= data0[data0.onnet_mou_9.isna()].index
+
+# Checking values of total incoming and total outgoing mou for all 4 months for observations having above indexes.
+
+print('Month 6 incoming calls for observations having missing mou data: ', *data0.loc[ind6, 'total_ic_mou_6'].unique())
+print('Month 6 outgoing calls for observations having missing mou data: ', *data0.loc[ind6, 'total_og_mou_6'].unique())
+print('Month 7 incoming calls for observations having missing mou data: ', *data0.loc[ind7, 'total_ic_mou_7'].unique())
+print('Month 7 outgoing calls for observations having missing mou data: ', *data0.loc[ind7, 'total_og_mou_7'].unique())
+print('Month 8 incoming calls for observations having missing mou data: ', *data0.loc[ind8, 'total_ic_mou_8'].unique())
+print('Month 8 outgoing calls for observations having missing mou data: ', *data0.loc[ind8, 'total_og_mou_8'].unique())
+print('Month 9 incoming calls for observations having missing mou data: ', *data0.loc[ind9, 'total_ic_mou_9'].unique())
+print('Month 9 outgoing calls for observations having missing mou data: ', *data0.loc[ind9, 'total_og_mou_9'].unique())
+Month 6 incoming calls for observations having missing mou data:  0.0
+Month 6 outgoing calls for observations having missing mou data:  0.0
+Month 7 incoming calls for observations having missing mou data:  0.0
+Month 7 outgoing calls for observations having missing mou data:  0.0
+Month 8 incoming calls for observations having missing mou data:  0.0
+Month 8 outgoing calls for observations having missing mou data:  0.0
+Month 9 incoming calls for observations having missing mou data:  0.0
+Month 9 outgoing calls for observations having missing mou data:  0.0
+Above, we can see all these observations have 0 values. So, our assumption is True and we can impute missing values in all above columns with 0.
+
+# Missing value imputation
+mou_cols= data0.loc[:,data0.columns.str.endswith(('mou_6', 'mou_7', 'mou_8', '_others_6', '_others_7','_others_8', 'mou_9', '_others_9'))].columns
+for col in mou_cols:
+    data0[col].fillna(0, inplace= True)
+
+# Checking missing values again
+data0.isna().sum().sort_values(ascending= False)
+date_of_last_rech_data_6    74846
+date_of_last_rech_data_7    74428
+date_of_last_rech_data_9    74077
+date_of_last_rech_data_8    73660
+date_of_last_rech_9          4760
+date_of_last_rech_8          3622
+date_of_last_rech_7          1767
+last_date_of_month_9         1659
+date_of_last_rech_6          1607
+last_date_of_month_8         1100
+loc_og_t2o_mou               1018
+std_og_t2o_mou               1018
+loc_ic_t2o_mou               1018
+last_date_of_month_7          601
+spl_og_mou_7                    0
+spl_og_mou_6                    0
+sep_vbc_3g                      0
+spl_og_mou_8                    0
+spl_og_mou_9                    0
+og_others_6                     0
+isd_og_mou_8                    0
+og_others_7                     0
+isd_og_mou_9                    0
+std_og_mou_8                    0
+isd_og_mou_7                    0
+isd_og_mou_6                    0
+std_og_mou_9                    0
+og_others_9                     0
+std_og_mou_7                    0
+std_og_mou_6                    0
+std_og_t2c_mou_9                0
+std_og_t2c_mou_8                0
+og_others_8                     0
+total_og_mou_9                  0
+total_og_mou_6                  0
+loc_ic_t2f_mou_8                0
+std_ic_t2m_mou_7                0
+std_ic_t2m_mou_6                0
+std_ic_t2t_mou_9                0
+std_ic_t2t_mou_8                0
+std_ic_t2t_mou_7                0
+std_ic_t2t_mou_6                0
+loc_ic_mou_9                    0
+loc_ic_mou_8                    0
+loc_ic_mou_7                    0
+loc_ic_mou_6                    0
+loc_ic_t2f_mou_9                0
+loc_ic_t2f_mou_7                0
+total_og_mou_7                  0
+loc_ic_t2f_mou_6                0
+loc_ic_t2m_mou_9                0
+loc_ic_t2m_mou_8                0
+loc_ic_t2m_mou_7                0
+loc_ic_t2m_mou_6                0
+loc_ic_t2t_mou_9                0
+loc_ic_t2t_mou_8                0
+loc_ic_t2t_mou_7                0
+loc_ic_t2t_mou_6                0
+std_og_t2c_mou_6                0
+total_og_mou_8                  0
+std_og_t2c_mou_7                0
+std_og_t2f_mou_6                0
+std_og_t2f_mou_9                0
+offnet_mou_8                    0
+loc_og_t2t_mou_7                0
+loc_og_t2t_mou_6                0
+roam_og_mou_9                   0
+roam_og_mou_8                   0
+roam_og_mou_7                   0
+roam_og_mou_6                   0
+roam_ic_mou_9                   0
+roam_ic_mou_8                   0
+roam_ic_mou_7                   0
+roam_ic_mou_6                   0
+offnet_mou_9                    0
+offnet_mou_7                    0
+loc_og_t2t_mou_9                0
+offnet_mou_6                    0
+onnet_mou_9                     0
+onnet_mou_8                     0
+onnet_mou_7                     0
+onnet_mou_6                     0
+arpu_9                          0
+arpu_8                          0
+arpu_7                          0
+arpu_6                          0
+last_date_of_month_6            0
+circle_id                       0
+loc_og_t2t_mou_8                0
+loc_og_t2m_mou_6                0
+std_og_t2f_mou_8                0
+loc_og_mou_8                    0
+std_og_t2f_mou_7                0
+std_ic_t2m_mou_9                0
+std_og_t2m_mou_9                0
+std_og_t2m_mou_8                0
+std_og_t2m_mou_7                0
+std_og_t2m_mou_6                0
+std_og_t2t_mou_9                0
+std_og_t2t_mou_8                0
+std_og_t2t_mou_7                0
+std_og_t2t_mou_6                0
+loc_og_mou_9                    0
+loc_og_mou_7                    0
+loc_og_t2m_mou_7                0
+loc_og_mou_6                    0
+loc_og_t2c_mou_9                0
+loc_og_t2c_mou_8                0
+loc_og_t2c_mou_7                0
+loc_og_t2c_mou_6                0
+loc_og_t2f_mou_9                0
+loc_og_t2f_mou_8                0
+loc_og_t2f_mou_7                0
+loc_og_t2f_mou_6                0
+loc_og_t2m_mou_9                0
+loc_og_t2m_mou_8                0
+std_ic_t2m_mou_8                0
+std_ic_t2f_mou_9                0
+std_ic_t2f_mou_6                0
+vol_3g_mb_6                     0
+arpu_2g_9                       0
+arpu_2g_8                       0
+arpu_2g_7                       0
+arpu_2g_6                       0
+arpu_3g_9                       0
+arpu_3g_8                       0
+arpu_3g_7                       0
+arpu_3g_6                       0
+vol_3g_mb_9                     0
+vol_3g_mb_8                     0
+vol_3g_mb_7                     0
+vol_2g_mb_9                     0
+std_ic_t2f_mou_7                0
+vol_2g_mb_8                     0
+vol_2g_mb_7                     0
+vol_2g_mb_6                     0
+av_rech_amt_data_9              0
+av_rech_amt_data_8              0
+av_rech_amt_data_7              0
+av_rech_amt_data_6              0
+count_rech_3g_9                 0
+count_rech_3g_8                 0
+count_rech_3g_7                 0
+count_rech_3g_6                 0
+night_pck_user_6                0
+night_pck_user_7                0
+night_pck_user_8                0
+night_pck_user_9                0
+jul_vbc_3g                      0
+aug_vbc_3g                      0
+aon                             0
+fb_user_9                       0
+fb_user_8                       0
+fb_user_7                       0
+fb_user_6                       0
+sachet_3g_9                     0
+sachet_3g_8                     0
+sachet_3g_7                     0
+sachet_3g_6                     0
+monthly_3g_9                    0
+monthly_3g_8                    0
+monthly_3g_7                    0
+monthly_3g_6                    0
+sachet_2g_9                     0
+sachet_2g_8                     0
+sachet_2g_7                     0
+sachet_2g_6                     0
+monthly_2g_9                    0
+monthly_2g_8                    0
+monthly_2g_7                    0
+monthly_2g_6                    0
+count_rech_2g_9                 0
+count_rech_2g_8                 0
+count_rech_2g_7                 0
+ic_others_8                     0
+ic_others_6                     0
+isd_ic_mou_9                    0
+isd_ic_mou_8                    0
+isd_ic_mou_7                    0
+isd_ic_mou_6                    0
+spl_ic_mou_9                    0
+spl_ic_mou_8                    0
+spl_ic_mou_7                    0
+spl_ic_mou_6                    0
+total_ic_mou_9                  0
+total_ic_mou_8                  0
+total_ic_mou_7                  0
+total_ic_mou_6                  0
+std_ic_mou_9                    0
+std_ic_mou_8                    0
+std_ic_mou_7                    0
+std_ic_mou_6                    0
+std_ic_t2o_mou_9                0
+std_ic_t2o_mou_8                0
+std_ic_t2o_mou_7                0
+std_ic_t2o_mou_6                0
+jun_vbc_3g                      0
+std_ic_t2f_mou_8                0
+ic_others_7                     0
+ic_others_9                     0
+count_rech_2g_6                 0
+total_rech_num_6                0
+max_rech_data_9                 0
+max_rech_data_8                 0
+max_rech_data_7                 0
+max_rech_data_6                 0
+total_rech_data_9               0
+total_rech_data_8               0
+total_rech_data_7               0
+total_rech_data_6               0
+last_day_rch_amt_9              0
+last_day_rch_amt_8              0
+last_day_rch_amt_7              0
+last_day_rch_amt_6              0
+max_rech_amt_9                  0
+max_rech_amt_8                  0
+max_rech_amt_7                  0
+max_rech_amt_6                  0
+total_rech_amt_9                0
+total_rech_amt_8                0
+total_rech_amt_7                0
+total_rech_amt_6                0
+total_rech_num_9                0
+total_rech_num_8                0
+total_rech_num_7                0
+mobile_number                   0
+dtype: int64
+Dropping unnecessary columns
+# Checking value_counts for loc_og_t2o_mou , std_og_t2o_mou , loc_ic_t2o_mou columns
+print(data0.loc_og_t2o_mou.value_counts(dropna= False))
+print(data0.std_og_t2o_mou.value_counts(dropna= False))
+print(data0.loc_ic_t2o_mou.value_counts(dropna= False))
+0.0    98981
+NaN     1018
+Name: loc_og_t2o_mou, dtype: int64
+0.0    98981
+NaN     1018
+Name: std_og_t2o_mou, dtype: int64
+0.0    98981
+NaN     1018
+Name: loc_ic_t2o_mou, dtype: int64
+All these columns have 0 value and missing values. As it's minutes of usage column it can not be categorical. Even if we impute these missing values using mean, median imputation value will be 0. That will make these columns zero variance column with mean 0. Information Value for these columns will be 0. hence dropping these columns instead of imputing.
+
+# Dropping above 3 columns
+data0.drop(['loc_og_t2o_mou', 'std_og_t2o_mou', 'loc_ic_t2o_mou'], axis= 1, inplace= True)
+Droping all date columns, as we have redundant information from other features so these date columns will not add much of new insights for our analysis. Also dropping mobile_number.
+
+# Dropping mobile no. column
+data0.drop('mobile_number', axis= 1, inplace= True)
+# Dropping all date columns
+print('Shape before dropping:', data0.shape)
+data0= data0.loc[:, ~data0.columns.str.contains('date_of')]
+print('Shape after dropping:', data0.shape)
+
+# Checking missing values again
+data0.isna().sum().sort_values(ascending= False)
+Shape before dropping: (99999, 222)
+Shape after dropping: (99999, 210)
+sep_vbc_3g            0
+std_og_t2f_mou_9      0
+total_og_mou_9        0
+total_og_mou_8        0
+total_og_mou_7        0
+total_og_mou_6        0
+og_others_9           0
+og_others_8           0
+og_others_7           0
+og_others_6           0
+spl_og_mou_9          0
+spl_og_mou_8          0
+spl_og_mou_7          0
+spl_og_mou_6          0
+isd_og_mou_9          0
+isd_og_mou_8          0
+isd_og_mou_7          0
+isd_og_mou_6          0
+std_og_mou_9          0
+std_og_mou_8          0
+std_og_mou_7          0
+std_og_mou_6          0
+std_og_t2c_mou_9      0
+std_og_t2c_mou_8      0
+std_og_t2c_mou_7      0
+loc_ic_t2t_mou_6      0
+loc_ic_t2t_mou_7      0
+loc_ic_t2t_mou_8      0
+loc_ic_mou_9          0
+std_ic_t2f_mou_7      0
+std_ic_t2f_mou_6      0
+std_ic_t2m_mou_9      0
+std_ic_t2m_mou_8      0
+std_ic_t2m_mou_7      0
+std_ic_t2m_mou_6      0
+std_ic_t2t_mou_9      0
+std_ic_t2t_mou_8      0
+std_ic_t2t_mou_7      0
+std_ic_t2t_mou_6      0
+loc_ic_mou_8          0
+loc_ic_t2t_mou_9      0
+loc_ic_mou_7          0
+loc_ic_mou_6          0
+loc_ic_t2f_mou_9      0
+loc_ic_t2f_mou_8      0
+loc_ic_t2f_mou_7      0
+loc_ic_t2f_mou_6      0
+loc_ic_t2m_mou_9      0
+loc_ic_t2m_mou_8      0
+loc_ic_t2m_mou_7      0
+loc_ic_t2m_mou_6      0
+std_og_t2c_mou_6      0
+std_og_t2f_mou_8      0
+jun_vbc_3g            0
+std_og_t2f_mou_7      0
+loc_og_t2t_mou_8      0
+loc_og_t2t_mou_7      0
+loc_og_t2t_mou_6      0
+roam_og_mou_9         0
+roam_og_mou_8         0
+roam_og_mou_7         0
+roam_og_mou_6         0
+roam_ic_mou_9         0
+roam_ic_mou_8         0
+roam_ic_mou_7         0
+roam_ic_mou_6         0
+offnet_mou_9          0
+offnet_mou_8          0
+offnet_mou_7          0
+offnet_mou_6          0
+onnet_mou_9           0
+onnet_mou_8           0
+onnet_mou_7           0
+onnet_mou_6           0
+arpu_9                0
+arpu_8                0
+arpu_7                0
+arpu_6                0
+loc_og_t2t_mou_9      0
+loc_og_t2m_mou_6      0
+loc_og_t2m_mou_7      0
+loc_og_mou_8          0
+std_og_t2f_mou_6      0
+std_og_t2m_mou_9      0
+std_og_t2m_mou_8      0
+std_og_t2m_mou_7      0
+std_og_t2m_mou_6      0
+std_og_t2t_mou_9      0
+std_og_t2t_mou_8      0
+std_og_t2t_mou_7      0
+std_og_t2t_mou_6      0
+loc_og_mou_9          0
+loc_og_mou_7          0
+loc_og_t2m_mou_8      0
+loc_og_mou_6          0
+loc_og_t2c_mou_9      0
+loc_og_t2c_mou_8      0
+loc_og_t2c_mou_7      0
+loc_og_t2c_mou_6      0
+loc_og_t2f_mou_9      0
+loc_og_t2f_mou_8      0
+loc_og_t2f_mou_7      0
+loc_og_t2f_mou_6      0
+loc_og_t2m_mou_9      0
+std_ic_t2f_mou_8      0
+std_ic_t2f_mou_9      0
+std_ic_t2o_mou_6      0
+std_ic_t2o_mou_7      0
+night_pck_user_6      0
+arpu_2g_9             0
+arpu_2g_8             0
+arpu_2g_7             0
+arpu_2g_6             0
+arpu_3g_9             0
+arpu_3g_8             0
+arpu_3g_7             0
+arpu_3g_6             0
+vol_3g_mb_9           0
+vol_3g_mb_8           0
+vol_3g_mb_7           0
+vol_3g_mb_6           0
+vol_2g_mb_9           0
+vol_2g_mb_8           0
+vol_2g_mb_7           0
+vol_2g_mb_6           0
+av_rech_amt_data_9    0
+av_rech_amt_data_8    0
+av_rech_amt_data_7    0
+av_rech_amt_data_6    0
+count_rech_3g_9       0
+count_rech_3g_8       0
+night_pck_user_7      0
+night_pck_user_8      0
+night_pck_user_9      0
+sachet_3g_6           0
+jul_vbc_3g            0
+aug_vbc_3g            0
+aon                   0
+fb_user_9             0
+fb_user_8             0
+fb_user_7             0
+fb_user_6             0
+sachet_3g_9           0
+sachet_3g_8           0
+sachet_3g_7           0
+monthly_3g_9          0
+monthly_2g_6          0
+monthly_3g_8          0
+monthly_3g_7          0
+monthly_3g_6          0
+sachet_2g_9           0
+sachet_2g_8           0
+sachet_2g_7           0
+sachet_2g_6           0
+monthly_2g_9          0
+monthly_2g_8          0
+monthly_2g_7          0
+count_rech_3g_7       0
+count_rech_3g_6       0
+count_rech_2g_9       0
+spl_ic_mou_7          0
+ic_others_9           0
+ic_others_8           0
+ic_others_7           0
+ic_others_6           0
+isd_ic_mou_9          0
+isd_ic_mou_8          0
+isd_ic_mou_7          0
+isd_ic_mou_6          0
+spl_ic_mou_9          0
+spl_ic_mou_8          0
+spl_ic_mou_6          0
+total_rech_num_7      0
+total_ic_mou_9        0
+total_ic_mou_8        0
+total_ic_mou_7        0
+total_ic_mou_6        0
+std_ic_mou_9          0
+std_ic_mou_8          0
+std_ic_mou_7          0
+std_ic_mou_6          0
+std_ic_t2o_mou_9      0
+std_ic_t2o_mou_8      0
+total_rech_num_6      0
+total_rech_num_8      0
+count_rech_2g_8       0
+last_day_rch_amt_9    0
+count_rech_2g_7       0
+count_rech_2g_6       0
+max_rech_data_9       0
+max_rech_data_8       0
+max_rech_data_7       0
+max_rech_data_6       0
+total_rech_data_9     0
+total_rech_data_8     0
+total_rech_data_7     0
+total_rech_data_6     0
+last_day_rch_amt_8    0
+total_rech_num_9      0
+last_day_rch_amt_7    0
+last_day_rch_amt_6    0
+max_rech_amt_9        0
+max_rech_amt_8        0
+max_rech_amt_7        0
+max_rech_amt_6        0
+total_rech_amt_9      0
+total_rech_amt_8      0
+total_rech_amt_7      0
+total_rech_amt_6      0
+circle_id             0
+dtype: int64
+All columns have now 0 missing values.
+
+Renaming columns and changing data types
+# Columns not having _<month no.> as suffix
+data0.loc[:,~ data0.columns.str.endswith(('_6','_7','_8', '_9'))].columns
+Index(['circle_id', 'aon', 'aug_vbc_3g', 'jul_vbc_3g', 'jun_vbc_3g', 'sep_vbc_3g'], dtype='object')
+# Renaming the columns
+data0.rename(columns= {'jun_vbc_3g': 'vbc_3g_6', 'jul_vbc_3g': 'vbc_3g_7', 'aug_vbc_3g':'vbc_3g_8', 'sep_vbc_3g':'vbc_3g_9'}, inplace= True)
+# Changing to integer from float
+cat_col= ['fb_user_6', 'night_pck_user_6', 'fb_user_7', 'night_pck_user_7', 'fb_user_8', 'night_pck_user_8']
+data0[cat_col]= data0[cat_col].astype('int')
+data1= data0.copy()
+Feature Engineering
+To identify high-value customers we'll perform feature engineering. We'll calculate average amount of recharge done by customers in Good Months (6, 7).
+
+# Calculating total recharge amount for data in each month and dropping original columns
+
+data1['total_rech_amt_data_6']= data1.total_rech_data_6 * data1.av_rech_amt_data_6
+data1['total_rech_amt_data_7']= data1.total_rech_data_7 * data1.av_rech_amt_data_7
+data1['total_rech_amt_data_8']= data1.total_rech_data_8 * data1.av_rech_amt_data_8
+data1['total_rech_amt_data_9']= data1.total_rech_data_9 * data1.av_rech_amt_data_9
+
+print('Shape before dropping:', data1.shape)
+
+data1.drop(['total_rech_data_6', 'av_rech_amt_data_6', 'total_rech_data_7', 'av_rech_amt_data_7',
+           'total_rech_data_8', 'av_rech_amt_data_8', 'total_rech_data_9', 'av_rech_amt_data_9'], axis= 1, inplace= True)
+
+print('Shape after dropping:', data1.shape)
+Shape before dropping: (99999, 214)
+Shape after dropping: (99999, 206)
+# Adding ARPU of data (3g and 2g) and dropping original columns
+
+data1['arpu_data_6']=  data1.arpu_2g_6 + data1.arpu_3g_6
+data1['arpu_data_7']=  data1.arpu_2g_7 + data1.arpu_3g_7
+data1['arpu_data_8']=  data1.arpu_2g_8 + data1.arpu_3g_8
+data1['arpu_data_9']=  data1.arpu_2g_9 + data1.arpu_3g_9
+
+print('Shape before dropping:', data1.shape)
+data1.drop(['arpu_2g_6', 'arpu_3g_6', 'arpu_2g_7', 'arpu_3g_7',
+           'arpu_2g_8', 'arpu_3g_8', 'arpu_2g_9', 'arpu_3g_9'], axis= 1, inplace= True)
+print('Shape after dropping:', data1.shape)
+Shape before dropping: (99999, 210)
+Shape after dropping: (99999, 202)
+# Calculating average recharge amount for month 6 and 7 combined
+data1['avg_rech_amt_6_7']= (data1.total_rech_amt_data_6 + data1.total_rech_amt_data_7 + 
+                            data1.total_rech_amt_6 + data1.total_rech_amt_7)/2
+Identifying high-value customers
+# Taking top 70 percentile customers as High Value customers
+data_hvc= data1[data1.avg_rech_amt_6_7 > np.percentile(data1['avg_rech_amt_6_7'], 70)]
+
+# Checking shape
+data_hvc.shape
+(29953, 203)
+Tagging churners
+We'll use total_ic_mou_9, total_og_mou_9, vol_2g_mb_9, vol_3g_mb_9 columns to tag the curners. For churners there will not be any voice and data usage.
+
+# Creating churn column and updating value of churn with 1 for the customers having no voice /data usage in month 9
+data_hvc['churn']= 0
+data_hvc.loc[(data_hvc.total_ic_mou_9== 0) & (data_hvc.total_og_mou_9== 0) & (data_hvc.vol_2g_mb_9== 0) & (data_hvc.vol_3g_mb_9== 0), 'churn']= 1
+data_hvc.churn.value_counts(dropna= True, normalize= True)
+0    0.918773
+1    0.081227
+Name: churn, dtype: float64
+# Channging data type of churn column
+data_hvc['churn']= data_hvc.churn.astype('int')
+# Now droping columns belong to month 9
+col_9= data_hvc.loc[:, data_hvc.columns.str.endswith('_9')].columns
+print('Shape before dropping:', data_hvc.shape)
+data_hvc.drop(col_9, axis= 1, inplace= True)
+print('Shape after dropping:', data_hvc.shape)
+Shape before dropping: (29953, 204)
+Shape after dropping: (29953, 154)
+Dropping columns having zero variance
+### Droping Columns having zero variance
+var_t= VarianceThreshold(threshold= 0)
+variance_thresh= var_t.fit(data_hvc)
+col_ind= var_t.get_support()
+
+# Below data_hvc have zero variance
+data_hvc.loc[:, ~col_ind].columns
+Index(['circle_id', 'std_og_t2c_mou_6', 'std_og_t2c_mou_7', 'std_og_t2c_mou_8', 'std_ic_t2o_mou_6', 'std_ic_t2o_mou_7', 'std_ic_t2o_mou_8'], dtype='object')
+# Dropping columns
+data_hvc.drop(data_hvc.loc[:, ~col_ind].columns, axis= 1, inplace= True)
+data_hvc.shape
+(29953, 147)
+Exploratory Data Analysis
+# Checking churn data
+plt.figure(figsize= [7,5])
+sns.countplot(data_hvc.churn, palette= 'Paired', label=[1,0])
+plt.show()
+
+We have already derived few fetaures and based on domain knowledge we have identified important featured to perform further analysis.
+
+# columns to analyze
+num_columns_to_analyze= ['total_rech_amt_data_6', 'arpu_data_6', 'arpu_6', 'onnet_mou_6', 'offnet_mou_6', 'total_og_mou_6', 
+                         'total_ic_mou_6', 'vol_2g_mb_6', 'vol_3g_mb_6','total_rech_amt_data_7', 'arpu_data_7', 'arpu_7', 
+                         'onnet_mou_7', 'offnet_mou_7', 'total_og_mou_7', 'total_ic_mou_7', 'vol_2g_mb_7', 'vol_3g_mb_7', 
+                         'total_rech_amt_data_8', 'arpu_data_8', 'arpu_8', 'onnet_mou_8', 'offnet_mou_8', 'total_og_mou_8', 
+                         'total_ic_mou_8', 'vol_2g_mb_8', 'vol_3g_mb_8','aon'
+                        ]
+
+char_columns_to_analyze= ['fb_user_6', 'night_pck_user_6', 'fb_user_7', 'night_pck_user_7', 'fb_user_8', 'night_pck_user_8']
+# Dividing the data into two dataframes
+data_hvc_0= data_hvc[data_hvc.churn== 0]
+print('Shape of data_hvc_0:', data_hvc_0.shape)
+data_hvc_1= data_hvc[data_hvc.churn== 1]
+print('Shape of data_hvc_1:', data_hvc_1.shape)
+Shape of data_hvc_0: (27520, 147)
+Shape of data_hvc_1: (2433, 147)
+# Function for univariate analysis of categorical variables
+def cat_univariate(app_df_new_0, app_df_new_1, col, fn_sup= 14, fn_s= 12, figsize= [20, 7], xtick_ro= 0):
+    t0_col = float(len(app_df_new_0))
+    t1_col = float(len(app_df_new_1))
+    sns.set_style("whitegrid")
+    fig= plt.figure(figsize= figsize)
+    f1_x_label= f'{col} for churn= 0'
+    f2_x_label= f'{col} for churn= 1'
+    ax1= fig.add_subplot(1,2,1)
+    ax1.set_xticklabels(f1_x_label, rotation= xtick_ro, ha= 'right',  fontdict= {'fontsize': fn_s, 'color': 'Teal'})
+    ax2= fig.add_subplot(1,2,2)
+    ax2.set_xticklabels(f2_x_label, rotation= xtick_ro, ha= 'right',  fontdict= {'fontsize': fn_s, 'color': 'Teal'})
+    sup_t= f'Count plot for {col}'
+    fig.suptitle(sup_t, fontdict= {'fontsize': fn_sup, 'color': 'Teal'})
+    fig1= sns.countplot(data= app_df_new_0, x= col, ax= ax1, palette= 'Paired')
+    fig2= sns.countplot(data= app_df_new_1, x= col, ax= ax2, palette= 'Paired_r')
+    fig1.set_ylabel('Count', fontdict= {'fontsize': fn_s, 'color': 'Black'})
+    fig1.set_xlabel(f1_x_label, fontdict= {'fontsize': fn_s, 'color': 'Black'})
+    fig2.set_xlabel(f2_x_label, fontdict= {'fontsize': fn_s, 'color': 'Black'})
+    for patch in fig1.patches:
+        percentage = '{:.1f}%'.format(100 * patch.get_height()/t0_col)
+        x= patch.get_x() + patch.get_width()
+        y= patch.get_height()
+        fig1.annotate(percentage, (patch.get_x() + patch.get_width() / 2.,
+                patch.get_height()), ha= 'center', va= 'center', 
+                xytext= (0, 5), textcoords= 'offset points', fontsize= 11, family= 'verdana')
+        
+    for patch2 in fig2.patches:
+        percentage= '{:.1f}%'.format(100 * patch2.get_height()/t1_col)
+        x= patch2.get_x() + patch2.get_width()
+        y= patch2.get_height()
+        fig2.annotate(percentage, (patch2.get_x() + patch2.get_width() / 2.,
+                patch2.get_height()), ha= 'center', va= 'center', 
+                xytext = (0, 5), textcoords= 'offset points', fontsize= 11, family='verdana')
+    
+# Checking character columns
+for col in char_columns_to_analyze:
+    cat_univariate(app_df_new_0= data_hvc_0, app_df_new_1= data_hvc_1, col= col)
+
+
+
+
+
+
+# Function to plot numeric columns distribution
+def num_univariate(app_df_new_0, app_df_new_1, col, fn_sup= 14, fn_s= 12, figsize=[18, 7], xtick_ro= 0):
+    sns.set_style("whitegrid")
+    fig= plt.figure(figsize= figsize)
+    sup_t= f'Density plot for {col}'
+    fig.suptitle(sup_t, fontdict= {'fontsize': fn_sup, 'color': 'Teal'})
+    sns.distplot(app_df_new_0[app_df_new_0[col].notna()][col], hist= False, label= 'Non-churn')
+    sns.distplot(app_df_new_1[app_df_new_1[col].notna()][col], hist= False, label='Churn')
+# Distplot of numeric columns
+for col in num_columns_to_analyze:
+    num_univariate(app_df_new_0= data_hvc_0, app_df_new_1= data_hvc_1, col= col)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Let's see the correlation matrix 
+plt.figure(figsize = (20,20))
+sns.heatmap(data_hvc.drop('churn', axis=1).corr(), cmap= 'coolwarm')
+<matplotlib.axes._subplots.AxesSubplot at 0x7f0757aaff10>
+
+# Finding top 100 High correlated features
+a= data_hvc.corr()
+corr_0= a.where(np.triu(np.ones(a.shape), k=1).astype(np.bool))
+corr_0= corr_0.unstack().dropna()
+corr_0= pd.DataFrame(corr_0).reset_index()
+corr_0.columns= ['Var 1','Var 2','correlation']
+corr_0['abs_correlation']= np.abs(corr_0['correlation'])
+corr_0.sort_values('abs_correlation', ascending= False).head(100)
+Var 1	Var 2	correlation	abs_correlation
+7857	sachet_2g_8	count_rech_2g_8	0.987175	0.987175
+7732	sachet_2g_7	count_rech_2g_7	0.986423	0.986423
+7608	sachet_2g_6	count_rech_2g_6	0.984939	0.984939
+4467	total_rech_amt_8	arpu_8	0.955322	0.955322
+4278	total_rech_amt_6	arpu_6	0.946104	0.946104
+4372	total_rech_amt_7	arpu_7	0.943571	0.943571
+989	isd_og_mou_8	isd_og_mou_7	0.943120	0.943120
+988	isd_og_mou_8	isd_og_mou_6	0.918187	0.918187
+945	isd_og_mou_7	isd_og_mou_6	0.915247	0.915247
+3066	total_ic_mou_6	loc_ic_mou_6	0.896444	0.896444
+3225	total_ic_mou_8	loc_ic_mou_8	0.896204	0.896204
+3145	total_ic_mou_7	loc_ic_mou_7	0.884392	0.884392
+8625	sachet_3g_8	count_rech_3g_8	0.875300	0.875300
+501	std_og_t2t_mou_8	onnet_mou_8	0.860648	0.860648
+469	std_og_t2t_mou_7	onnet_mou_7	0.860314	0.860314
+10424	arpu_data_8	monthly_3g_8	0.859403	0.859403
+438	std_og_t2t_mou_6	onnet_mou_6	0.859328	0.859328
+8494	sachet_3g_7	count_rech_3g_7	0.857996	0.857996
+10280	arpu_data_7	monthly_3g_7	0.857153	0.857153
+568	std_og_t2m_mou_7	offnet_mou_7	0.854589	0.854589
+1419	total_og_mou_8	std_og_mou_8	0.851202	0.851202
+8364	sachet_3g_6	count_rech_3g_6	0.851090	0.851090
+603	std_og_t2m_mou_8	offnet_mou_8	0.850904	0.850904
+1366	total_og_mou_7	std_og_mou_7	0.849683	0.849683
+2139	loc_ic_mou_8	loc_ic_t2m_mou_8	0.848803	0.848803
+10137	arpu_data_6	monthly_3g_6	0.848049	0.848049
+2997	std_ic_mou_8	std_ic_t2m_mou_8	0.845787	0.845787
+2010	loc_ic_mou_6	loc_ic_t2m_mou_6	0.845038	0.845038
+434	loc_og_mou_8	loc_og_mou_7	0.841901	0.841901
+2144	loc_ic_mou_8	loc_ic_mou_7	0.840165	0.840165
+2074	loc_ic_mou_7	loc_ic_t2m_mou_7	0.835213	0.835213
+1314	total_og_mou_6	std_og_mou_6	0.834083	0.834083
+152	loc_og_t2t_mou_8	loc_og_t2t_mou_7	0.833078	0.833078
+534	std_og_t2m_mou_6	offnet_mou_6	0.830341	0.830341
+209	loc_og_t2m_mou_8	loc_og_t2m_mou_7	0.823632	0.823632
+2079	loc_ic_mou_7	loc_ic_mou_6	0.821001	0.821001
+3239	total_ic_mou_8	total_ic_mou_7	0.820559	0.820559
+2920	std_ic_mou_7	std_ic_t2m_mou_7	0.819444	0.819444
+2844	std_ic_mou_6	std_ic_t2m_mou_6	0.814191	0.814191
+1769	loc_ic_t2m_mou_8	loc_ic_t2m_mou_7	0.812449	0.812449
+252	loc_og_t2f_mou_7	loc_og_t2f_mou_6	0.809115	0.809115
+405	loc_og_mou_7	loc_og_mou_6	0.806823	0.806823
+1595	loc_ic_t2t_mou_8	loc_ic_t2t_mou_7	0.806815	0.806815
+14	onnet_mou_8	onnet_mou_7	0.806093	0.806093
+369	loc_og_mou_6	loc_og_t2m_mou_6	0.804524	0.804524
+3159	total_ic_mou_7	total_ic_mou_6	0.803058	0.803058
+527	std_og_t2t_mou_8	std_og_t2t_mou_7	0.802164	0.802164
+1539	loc_ic_t2t_mou_7	loc_ic_t2t_mou_6	0.801808	0.801808
+10580	avg_rech_amt_6_7	total_rech_amt_data_7	0.797314	0.797314
+10268	arpu_data_7	vol_3g_mb_7	0.794664	0.794664
+135	loc_og_t2t_mou_7	loc_og_t2t_mou_6	0.794396	0.794396
+860	std_og_mou_8	std_og_mou_7	0.792890	0.792890
+1710	loc_ic_t2m_mou_7	loc_ic_t2m_mou_6	0.791403	0.791403
+426	loc_og_mou_8	loc_og_t2m_mou_8	0.788642	0.788642
+10579	avg_rech_amt_6_7	total_rech_amt_data_6	0.786274	0.786274
+740	std_og_t2f_mou_8	std_og_t2f_mou_7	0.785892	0.785892
+189	loc_og_t2m_mou_7	loc_og_t2m_mou_6	0.784197	0.784197
+1952	loc_ic_t2f_mou_8	loc_ic_t2f_mou_7	0.781074	0.781074
+10412	arpu_data_8	vol_3g_mb_8	0.780252	0.780252
+275	loc_og_t2f_mou_8	loc_og_t2f_mou_7	0.777162	0.777162
+1430	total_og_mou_8	total_og_mou_7	0.775623	0.775623
+397	loc_og_mou_7	loc_og_t2m_mou_7	0.774069	0.774069
+10125	arpu_data_6	vol_3g_mb_6	0.770893	0.770893
+3219	total_ic_mou_8	loc_ic_t2m_mou_8	0.768747	0.768747
+35	offnet_mou_8	offnet_mou_7	0.767933	0.767933
+423	loc_og_mou_8	loc_og_t2t_mou_8	0.767397	0.767397
+394	loc_og_mou_7	loc_og_t2t_mou_7	0.763770	0.763770
+629	std_og_t2m_mou_8	std_og_t2m_mou_7	0.763571	0.763571
+855	std_og_mou_8	std_og_t2m_mou_8	0.762876	0.762876
+2	arpu_8	arpu_7	0.759924	0.759924
+3060	total_ic_mou_6	loc_ic_t2m_mou_6	0.759723	0.759723
+814	std_og_mou_7	std_og_t2m_mou_7	0.756998	0.756998
+4373	total_rech_amt_7	arpu_8	0.756461	0.756461
+1386	total_og_mou_8	offnet_mou_8	0.755008	0.755008
+4466	total_rech_amt_8	arpu_7	0.754522	0.754522
+4277	total_rech_num_8	total_rech_num_7	0.753532	0.753532
+366	loc_og_mou_6	loc_og_t2t_mou_6	0.753428	0.753428
+774	std_og_mou_6	std_og_t2m_mou_6	0.752689	0.752689
+3224	total_ic_mou_8	loc_ic_mou_7	0.751898	0.751898
+9	onnet_mou_7	onnet_mou_6	0.750907	0.750907
+594	std_og_t2m_mou_7	std_og_t2m_mou_6	0.748228	0.748228
+495	std_og_t2t_mou_7	std_og_t2t_mou_6	0.747775	0.747775
+852	std_og_mou_8	std_og_t2t_mou_8	0.746629	0.746629
+1890	loc_ic_t2f_mou_7	loc_ic_t2f_mou_6	0.746123	0.746123
+819	std_og_mou_7	std_og_mou_6	0.745196	0.745196
+771	std_og_mou_6	std_og_t2t_mou_6	0.744727	0.744727
+2277	std_ic_t2t_mou_7	std_ic_t2t_mou_6	0.743969	0.743969
+3146	total_ic_mou_7	loc_ic_mou_8	0.743654	0.743654
+3139	total_ic_mou_7	loc_ic_t2m_mou_7	0.743522	0.743522
+2925	std_ic_mou_7	std_ic_mou_6	0.742747	0.742747
+3654	isd_ic_mou_7	isd_ic_mou_6	0.742524	0.742524
+3002	std_ic_mou_8	std_ic_mou_7	0.742032	0.742032
+27	offnet_mou_7	offnet_mou_6	0.739692	0.739692
+811	std_og_mou_7	std_og_t2t_mou_7	0.739494	0.739494
+3067	total_ic_mou_6	loc_ic_mou_7	0.739456	0.739456
+1281	total_og_mou_6	offnet_mou_6	0.739447	0.739447
+1333	total_og_mou_7	offnet_mou_7	0.739041	0.739041
+6785	vol_3g_mb_8	vol_3g_mb_7	0.736552	0.736552
+3740	isd_ic_mou_8	isd_ic_mou_7	0.735274	0.735274
+2143	loc_ic_mou_8	loc_ic_mou_6	0.732429	0.732429
+Inference:
+We can see high class imbalance in data.
+If we compare month 6, 7, 8, percentage of fb_user is gradually reducing for churn users. Users who are likely to churn gradually stopped using this service. Again, more than 50% of non-churn users use this service, where for churn users it's always below 50% and in Action month (August) it's only 14%. Users quitting this service
+Reduction of night pack users can be seen within the churn users. In June 1.6% of churned users used to use night pack which is almost similar of whole population. But in the month of July, it became .9% for the churned users and in Action month (August) only .4% of the churned users were using the night pack, which is considerably smaller than the whole population. So, users who suddenly stop using night packs are likely to churn.
+Most of the numeric features are right skewed. We'll take care of this during scaling by performing Robust Scaling, using median and quantile values.
+Most of the features have high correlation. As, first we want to build an interpretable model, we can't perform PCA as it'll change the actual features and Principal Components will not have any business interpretation.
+1st Approach: We'll use RFE to reduce correlated features and then we'll build Logistic Regression model and will check VIF and p-value simultaneously to remove multicollinearity and to find statistically significant beta coefficients for identified features.
+
+2nd Approach: Then we'll try PCA and will explore Blackbox models to achieve better performance.
+
+# Copying data for data preparation
+data_hvc1= data_hvc.copy()
+Data preparation
+Train-Test split
+# Train-Test Split
+y= data_hvc1['churn']
+X= data_hvc1.drop('churn', axis= 1)
+
+X_train, X_test, y_train, y_test= train_test_split(X, y, train_size= .7, stratify= y, random_state= 42)
+Oversampling of minority class using SMOTE
+### Oversampling minority class with SMOTE
+smote= SMOTE(random_state= 42)
+print('Values before oversampling:\n', y_train.value_counts())
+X_train_sm, y_train_sm= smote.fit_resample(X_train, y_train)
+X_train_sm= pd.DataFrame(X_train_sm, columns= X_train.columns)
+print('Values after oversampling:\n', pd.DataFrame(y_train_sm).value_counts())
+Values before oversampling:
+ 0    19264
+1     1703
+Name: churn, dtype: int64
+Values after oversampling:
+ 1    19264
+0    19264
+dtype: int64
+Scaling numeric features
+During EDA we have observed few outliers in numeric features. So, using Robust Scaling using median and quantile values instead of Standard Scaling using mean and standard deviation.
+
+# Selecting columns for scaling
+all_cols= X_train_sm.columns.tolist()
+print('All columns: ', len(all_cols))
+columns_to_remove= ['fb_user_6', 'night_pck_user_6', 'fb_user_7', 'night_pck_user_7', 'fb_user_8', 'night_pck_user_8']
+for col in columns_to_remove:
+    all_cols.remove(col)
+print('All columns after removing: ', len(all_cols))
+All columns:  146
+All columns after removing:  140
+# Performing Robust Scaling
+scaler= RobustScaler(quantile_range=(2, 98))
+scaler.fit(X_train_sm[all_cols]) # Fitting on Training dataset
+X_train_sm[all_cols]= scaler.transform(X_train_sm[all_cols]) # Transforming training dataset
+X_test[all_cols]= scaler.transform(X_test[all_cols]) # Transforming testing dataset
+# Checking scaled features and shape of training data
+print(X_train_sm.shape)
+X_train_sm[all_cols].head()
+(38528, 146)
+arpu_6	arpu_7	arpu_8	onnet_mou_6	onnet_mou_7	onnet_mou_8	offnet_mou_6	offnet_mou_7	offnet_mou_8	roam_ic_mou_6	roam_ic_mou_7	roam_ic_mou_8	roam_og_mou_6	roam_og_mou_7	roam_og_mou_8	loc_og_t2t_mou_6	loc_og_t2t_mou_7	loc_og_t2t_mou_8	loc_og_t2m_mou_6	loc_og_t2m_mou_7	loc_og_t2m_mou_8	loc_og_t2f_mou_6	loc_og_t2f_mou_7	loc_og_t2f_mou_8	loc_og_t2c_mou_6	loc_og_t2c_mou_7	loc_og_t2c_mou_8	loc_og_mou_6	loc_og_mou_7	loc_og_mou_8	std_og_t2t_mou_6	std_og_t2t_mou_7	std_og_t2t_mou_8	std_og_t2m_mou_6	std_og_t2m_mou_7	std_og_t2m_mou_8	std_og_t2f_mou_6	std_og_t2f_mou_7	std_og_t2f_mou_8	std_og_mou_6	std_og_mou_7	std_og_mou_8	isd_og_mou_6	isd_og_mou_7	isd_og_mou_8	spl_og_mou_6	spl_og_mou_7	spl_og_mou_8	og_others_6	og_others_7	og_others_8	total_og_mou_6	total_og_mou_7	total_og_mou_8	loc_ic_t2t_mou_6	loc_ic_t2t_mou_7	loc_ic_t2t_mou_8	loc_ic_t2m_mou_6	loc_ic_t2m_mou_7	loc_ic_t2m_mou_8	loc_ic_t2f_mou_6	loc_ic_t2f_mou_7	loc_ic_t2f_mou_8	loc_ic_mou_6	loc_ic_mou_7	loc_ic_mou_8	std_ic_t2t_mou_6	std_ic_t2t_mou_7	std_ic_t2t_mou_8	std_ic_t2m_mou_6	std_ic_t2m_mou_7	std_ic_t2m_mou_8	std_ic_t2f_mou_6	std_ic_t2f_mou_7	std_ic_t2f_mou_8	std_ic_mou_6	std_ic_mou_7	std_ic_mou_8	total_ic_mou_6	total_ic_mou_7	total_ic_mou_8	spl_ic_mou_6	spl_ic_mou_7	spl_ic_mou_8	isd_ic_mou_6	isd_ic_mou_7	isd_ic_mou_8	ic_others_6	ic_others_7	ic_others_8	total_rech_num_6	total_rech_num_7	total_rech_num_8	total_rech_amt_6	total_rech_amt_7	total_rech_amt_8	max_rech_amt_6	max_rech_amt_7	max_rech_amt_8	last_day_rch_amt_6	last_day_rch_amt_7	last_day_rch_amt_8	max_rech_data_6	max_rech_data_7	max_rech_data_8	count_rech_2g_6	count_rech_2g_7	count_rech_2g_8	count_rech_3g_6	count_rech_3g_7	count_rech_3g_8	vol_2g_mb_6	vol_2g_mb_7	vol_2g_mb_8	vol_3g_mb_6	vol_3g_mb_7	vol_3g_mb_8	monthly_2g_6	monthly_2g_7	monthly_2g_8	sachet_2g_6	sachet_2g_7	sachet_2g_8	monthly_3g_6	monthly_3g_7	monthly_3g_8	sachet_3g_6	sachet_3g_7	sachet_3g_8	aon	vbc_3g_8	vbc_3g_7	vbc_3g_6	total_rech_amt_data_6	total_rech_amt_data_7	total_rech_amt_data_8	arpu_data_6	arpu_data_7	arpu_data_8	avg_rech_amt_6_7
+0	-0.084922	0.090254	0.087887	-0.017088	-0.019687	0.050844	0.031196	0.065798	0.239479	0.0	0.0	0.0	0.0	0.0	0.0	0.079014	0.049087	0.240427	0.226100	0.246947	0.484519	1.099257	1.757373	2.18589	0.000000	0.000000	0.000000	0.206783	0.239897	0.498514	-0.006070	-0.003782	0.000000	-0.016792	-0.013222	-0.001232	0.0	0.0	0.0	-0.033635	-0.025450	-0.003299	0.0	0.0	0.0	-0.019892	-0.022177	0.000000	0.000000	0.0	0.0	-0.031290	-0.005238	0.185273	0.063829	0.059592	0.367602	0.121556	0.017191	0.229989	0.705783	0.285581	0.348479	0.164827	0.047372	0.297591	-0.011802	-0.008841	0.050352	-0.036474	0.011869	0.007791	0.000000	0.000000	0.0	-0.046021	-0.013528	0.013976	0.094265	0.008923	0.230304	0.000000	0.0	0.0	0.0	0.0	0.000000	0.000000	0.000000	0.000000	-0.128722	-0.108805	-0.063906	0.200887	-0.150394	0.208042	0.330669	0.078667	0.541818	0.538614	-0.10	0.951182	0.400549	0.523038	0.000000	0.108736	0.000000	0.000	0.0	0.331702	0.0	0.125693	0.117279	0.000000	0.000000	0.000000	0.000000	1.0	0.0	0.0	0.000000	0.000000	0.000	0.0	0.5	0.0	0.0	0.0	0.0	0.347981	0.000000	0.000000	0.000000	0.039096	0.041597	0.000000	0.000000	0.297657	0.000000	0.004983
+1	-0.116062	-0.075900	0.012492	-0.042982	-0.035659	-0.011273	-0.015239	0.011008	0.051963	0.0	0.0	0.0	0.0	0.0	0.0	-0.035112	-0.024366	-0.011914	0.059167	0.002133	0.075462	0.000000	0.000000	0.00000	0.000000	0.000000	0.000000	0.009678	-0.021502	0.038600	-0.000875	-0.000816	0.009562	0.026245	0.077923	0.065963	0.0	0.0	0.0	-0.000188	0.038864	0.044914	0.0	0.0	0.0	0.114998	0.049994	0.410710	0.237407	0.0	0.0	-0.080208	-0.053100	0.025111	-0.030831	-0.040981	0.029265	-0.078744	-0.050445	0.056094	-0.005090	0.021389	0.003697	-0.082547	-0.061022	0.036281	0.194863	0.168842	0.438850	0.172914	0.539727	0.436417	0.000000	0.000000	0.0	0.156581	0.389970	0.426056	-0.044140	0.022549	0.110746	0.000000	0.0	0.0	0.0	0.0	0.000000	1.063317	0.018283	0.148284	0.124061	0.081604	0.095858	-0.116534	-0.062996	0.022558	-0.040148	-0.093333	-0.090909	-0.073267	0.00	0.076810	0.084788	0.107210	0.182540	0.326208	0.326972	0.125	0.0	0.000000	0.0	0.301463	0.530485	0.071317	0.000000	0.000000	0.000000	0.0	0.0	0.0	0.331924	0.328306	0.125	0.0	0.0	0.0	0.0	0.0	0.0	-0.117485	0.000000	0.000000	0.000000	0.080415	0.103304	0.016407	0.040523	0.007868	0.004347	-0.010243
+2	-0.226631	-0.218325	-0.136188	-0.048215	-0.041521	-0.020439	-0.093114	-0.092798	-0.025293	0.0	0.0	0.0	0.0	0.0	0.0	-0.036687	-0.036793	-0.014749	-0.063197	-0.069198	-0.028960	0.000000	0.000000	0.00000	0.261704	0.713844	0.387351	-0.068205	-0.073669	-0.032060	-0.006070	-0.003782	0.000000	-0.016792	-0.013222	-0.001232	0.0	0.0	0.0	-0.033635	-0.025450	-0.003299	0.0	0.0	0.0	0.267707	0.299255	1.156546	0.000000	0.0	0.0	-0.141374	-0.126611	-0.034564	-0.000234	-0.038116	-0.011706	-0.025547	-0.028454	0.045416	0.057119	0.026460	0.137303	-0.028625	-0.044559	0.029406	0.001775	0.028788	0.051216	0.091621	-0.022055	0.028908	0.100464	0.000000	0.0	0.045411	-0.021565	0.028277	-0.038520	-0.068299	0.016814	0.000000	0.0	0.0	0.0	0.0	0.071130	0.000000	0.000000	0.000000	0.048226	0.000000	0.223669	-0.228192	-0.211877	-0.117995	-0.136947	-0.126667	-0.136364	-0.083168	-0.05	-0.048818	0.084788	0.041553	0.099206	0.978625	0.762934	1.000	0.0	0.000000	0.0	0.003671	0.219337	0.029666	0.339711	0.060290	0.186271	0.0	0.0	0.0	0.995772	0.766048	1.000	0.0	0.0	0.0	0.0	0.0	0.0	-0.018789	0.196833	0.042623	0.229272	0.674294	0.316261	0.570679	-0.000471	0.001308	0.006627	0.296353
+3	-0.106149	0.068868	0.112619	0.026887	0.087266	0.124482	0.018385	0.066876	0.210251	0.0	0.0	0.0	0.0	0.0	0.0	0.242468	0.469768	0.504033	0.242451	0.315809	0.507673	0.007167	0.027023	0.00000	0.000000	0.000000	0.000000	0.243535	0.392173	0.531299	-0.006070	-0.003782	0.000000	-0.013926	-0.001599	0.024108	0.0	0.0	0.0	-0.031638	-0.017508	0.012474	0.0	0.0	0.0	0.130124	0.150993	0.000000	0.000000	0.0	0.0	-0.011687	0.066644	0.213378	0.523309	0.939413	1.140531	0.494942	0.524754	0.704355	0.022998	0.158879	0.106298	0.507490	0.664512	0.843394	-0.011802	0.000888	0.000000	0.020197	0.104247	0.174774	0.000000	0.170141	0.0	-0.011007	0.061814	0.108286	0.381456	0.532734	0.704758	0.588235	0.0	0.0	0.0	0.0	0.000000	0.000000	0.000000	0.050245	-0.103444	-0.136006	0.031953	-0.115071	0.034056	0.148134	0.055163	0.126667	0.098182	0.104950	0.33	0.277815	0.400549	0.444875	0.611111	0.108736	0.108991	0.125	0.0	0.000000	0.0	0.187711	0.122838	0.011289	0.000000	0.001552	0.044950	1.0	1.0	1.0	0.000000	0.000000	0.000	0.0	0.0	0.0	0.0	0.0	0.0	0.577530	0.081035	0.000000	0.000000	0.039096	0.035032	0.054928	0.001460	0.000000	0.002426	-0.037927
+4	-0.114405	-0.099716	-0.027813	-0.048971	-0.040154	-0.020439	-0.101918	-0.087912	-0.055678	0.0	0.0	0.0	0.0	0.0	0.0	-0.039496	-0.031414	-0.014749	-0.075001	-0.052712	-0.028960	0.000000	0.000000	0.00000	0.000000	0.000000	0.000000	-0.076855	-0.060560	-0.032060	-0.006070	-0.003782	0.000000	-0.016792	-0.013047	-0.001232	0.0	0.0	0.0	-0.033635	-0.025330	-0.003299	0.0	0.0	0.0	-0.019892	-0.022177	0.000000	0.000000	0.0	0.0	-0.149654	-0.126967	-0.054537	-0.025941	-0.029775	-0.002855	0.017103	0.097416	-0.011102	0.065790	0.002669	-0.000925	-0.007325	0.041031	-0.020324	0.045521	-0.008841	0.000000	0.025030	0.015522	0.053931	0.000000	0.000000	0.0	0.012314	-0.011184	0.028074	-0.029946	0.004330	-0.029145	0.000000	0.0	0.0	0.0	0.0	0.008294	0.000000	0.000000	0.000000	0.174618	0.326415	0.063906	-0.137500	-0.095008	-0.004516	-0.090781	-0.120000	0.098182	-0.083168	-0.05	0.338117	0.114025	0.041553	0.611111	1.413570	1.961829	0.750	0.0	0.000000	0.0	0.019149	0.030362	0.232149	0.643826	0.480318	0.518552	0.0	0.0	1.0	1.438337	1.969839	0.625	0.0	0.0	0.0	0.0	0.0	0.0	-0.066545	0.000000	0.000000	0.000000	1.542912	2.121533	0.597072	0.000028	0.007521	0.000011	1.695484
+Model Building
+We'll first build Logistic Regression model. Then We'll also explore different Blackbox models to improve overall model performance.
+
+1. Logistic Regression (RFE + Manual tunning)
+Using RFE to select top 20 features
+# Selecting to 20 features for Logistic Regression using RFE
+estimator= LogisticRegression(max_iter= 1000, random_state= 42)
+selector= RFE(estimator, n_features_to_select= 20)
+selector= selector.fit(X_train_sm, y_train_sm)
+selected_cols= X_train_sm.loc[:,selector.support_].columns
+selected_cols
+Index(['arpu_6', 'arpu_7', 'onnet_mou_7', 'roam_og_mou_7', 'loc_og_mou_8', 'total_og_mou_8', 'loc_ic_t2m_mou_7', 'loc_ic_mou_7', 'loc_ic_mou_8', 'total_ic_mou_8', 'spl_ic_mou_8', 'total_rech_num_7', 'total_rech_num_8', 'total_rech_amt_7', 'max_rech_amt_7', 'last_day_rch_amt_8', 'count_rech_2g_8', 'fb_user_8', 'aon', 'vbc_3g_8'], dtype='object')
+# Selecting top 20 features
+X_train_final= X_train_sm[selected_cols]
+Building 1st Logistic Regression model
+# Building Logistic Regression model using statsmodels
+
+X_train_final= sm.add_constant(X_train_final) # Adding constraint
+lreg1= sm.GLM(y_train_sm, X_train_final, family= sm.families.Binomial())
+lreg_model_1= lreg1.fit() # Fitting the model
+# Checking the summary of Logistic Regression model
+print(lreg_model_1.summary())
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:                      y   No. Observations:                38528
+Model:                            GLM   Df Residuals:                    38507
+Model Family:                Binomial   Df Model:                           20
+Link Function:                  logit   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -15112.
+Date:                Wed, 03 Nov 2021   Deviance:                       30223.
+Time:                        15:55:41   Pearson chi2:                 8.75e+09
+No. Iterations:                     7                                         
+Covariance Type:            nonrobust                                         
+======================================================================================
+                         coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+const                  1.3309      0.023     57.506      0.000       1.286       1.376
+arpu_6                 0.9791      0.075     13.084      0.000       0.832       1.126
+arpu_7                 1.3661      0.201      6.780      0.000       0.971       1.761
+onnet_mou_7            0.4570      0.075      6.063      0.000       0.309       0.605
+roam_og_mou_7          0.7005      0.056     12.546      0.000       0.591       0.810
+loc_og_mou_8          -1.3121      0.124    -10.619      0.000      -1.554      -1.070
+total_og_mou_8        -1.1987      0.101    -11.859      0.000      -1.397      -1.001
+loc_ic_t2m_mou_7       0.8740      0.192      4.557      0.000       0.498       1.250
+loc_ic_mou_7           2.1563      0.233      9.263      0.000       1.700       2.613
+loc_ic_mou_8          -5.4265      0.296    -18.341      0.000      -6.006      -4.847
+total_ic_mou_8        -2.1437      0.214    -10.038      0.000      -2.562      -1.725
+spl_ic_mou_8          -0.8811      0.066    -13.420      0.000      -1.010      -0.752
+total_rech_num_7       2.0923      0.115     18.259      0.000       1.868       2.317
+total_rech_num_8      -3.1430      0.123    -25.457      0.000      -3.385      -2.901
+total_rech_amt_7      -1.4794      0.218     -6.782      0.000      -1.907      -1.052
+max_rech_amt_7         0.9072      0.094      9.647      0.000       0.723       1.092
+last_day_rch_amt_8    -1.3772      0.061    -22.533      0.000      -1.497      -1.257
+count_rech_2g_8       -1.0670      0.098    -10.864      0.000      -1.259      -0.874
+fb_user_8             -1.1678      0.042    -27.741      0.000      -1.250      -1.085
+aon                   -1.0055      0.058    -17.367      0.000      -1.119      -0.892
+vbc_3g_8              -1.2243      0.085    -14.322      0.000      -1.392      -1.057
+======================================================================================
+# Creating function to calculate VIFs
+
+def vif_calculation(X_df):
+    vif= pd.DataFrame()
+    X= X_df.drop('const', axis= 1)
+    vif['Features'] = X.columns
+    vif['VIF']= [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+    vif['VIF']= round(vif['VIF'], 2)
+    return (vif.sort_values('VIF', ascending= False))
+# Calculating the VIFs for the 1st model
+vif_calculation(X_train_final)
+Features	VIF
+13	total_rech_amt_7	13.10
+1	arpu_7	11.28
+8	loc_ic_mou_8	9.48
+9	total_ic_mou_8	6.89
+7	loc_ic_mou_7	6.71
+6	loc_ic_t2m_mou_7	4.44
+5	total_og_mou_8	3.07
+12	total_rech_num_8	3.07
+11	total_rech_num_7	2.56
+14	max_rech_amt_7	2.20
+4	loc_og_mou_8	2.19
+17	fb_user_8	2.08
+16	count_rech_2g_8	1.73
+2	onnet_mou_7	1.68
+15	last_day_rch_amt_8	1.52
+0	arpu_6	1.45
+19	vbc_3g_8	1.35
+18	aon	1.25
+3	roam_og_mou_7	1.13
+10	spl_ic_mou_8	1.04
+All coefficients have p values less than .05 but arpu_7 and total_rech_amt_7 have high VIF. Average Revenue per user (arpu) should have direct correlation with total_rech_amt for the same month. Let's remove total_rech_amt_7 and building the model again.
+
+Building 2nd Logistic Regression model
+# Building Logistic Regression model using statsmodels
+X_train_final.drop('total_rech_amt_7', axis= 1, inplace= True) # Removing column
+lreg2= sm.GLM(y_train_sm, X_train_final, family= sm.families.Binomial())
+lreg_model_2= lreg2.fit() # Fitting the model
+# Checking the summary of Logistic Regression model
+print(lreg_model_2.summary())
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:                      y   No. Observations:                38528
+Model:                            GLM   Df Residuals:                    38508
+Model Family:                Binomial   Df Model:                           19
+Link Function:                  logit   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -15135.
+Date:                Wed, 03 Nov 2021   Deviance:                       30271.
+Time:                        15:55:58   Pearson chi2:                 1.07e+10
+No. Iterations:                     7                                         
+Covariance Type:            nonrobust                                         
+======================================================================================
+                         coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+const                  1.3501      0.023     59.074      0.000       1.305       1.395
+arpu_6                 0.9468      0.074     12.709      0.000       0.801       1.093
+arpu_7                 0.1916      0.099      1.945      0.052      -0.002       0.385
+onnet_mou_7            0.4509      0.076      5.948      0.000       0.302       0.600
+roam_og_mou_7          0.6860      0.055     12.448      0.000       0.578       0.794
+loc_og_mou_8          -1.3367      0.124    -10.790      0.000      -1.579      -1.094
+total_og_mou_8        -1.3174      0.099    -13.261      0.000      -1.512      -1.123
+loc_ic_t2m_mou_7       0.8862      0.192      4.615      0.000       0.510       1.263
+loc_ic_mou_7           2.1537      0.233      9.238      0.000       1.697       2.611
+loc_ic_mou_8          -5.4564      0.296    -18.454      0.000      -6.036      -4.877
+total_ic_mou_8        -2.1275      0.214     -9.962      0.000      -2.546      -1.709
+spl_ic_mou_8          -0.8789      0.066    -13.398      0.000      -1.007      -0.750
+total_rech_num_7       1.9015      0.110     17.267      0.000       1.686       2.117
+total_rech_num_8      -3.0523      0.122    -24.947      0.000      -3.292      -2.812
+max_rech_amt_7         0.5248      0.074      7.055      0.000       0.379       0.671
+last_day_rch_amt_8    -1.2971      0.058    -22.174      0.000      -1.412      -1.182
+count_rech_2g_8       -1.0846      0.098    -11.056      0.000      -1.277      -0.892
+fb_user_8             -1.1679      0.042    -27.750      0.000      -1.250      -1.085
+aon                   -1.0013      0.058    -17.318      0.000      -1.115      -0.888
+vbc_3g_8              -1.1999      0.085    -14.106      0.000      -1.367      -1.033
+======================================================================================
+# Calculating the VIFs for the 2nd model
+vif_calculation(X_train_final)
+Features	VIF
+8	loc_ic_mou_8	9.48
+9	total_ic_mou_8	6.89
+7	loc_ic_mou_7	6.71
+6	loc_ic_t2m_mou_7	4.44
+12	total_rech_num_8	3.06
+5	total_og_mou_8	3.03
+11	total_rech_num_7	2.47
+1	arpu_7	2.39
+4	loc_og_mou_8	2.19
+16	fb_user_8	2.08
+15	count_rech_2g_8	1.73
+2	onnet_mou_7	1.68
+13	max_rech_amt_7	1.62
+14	last_day_rch_amt_8	1.48
+0	arpu_6	1.45
+18	vbc_3g_8	1.35
+17	aon	1.25
+3	roam_og_mou_7	1.13
+10	spl_ic_mou_8	1.04
+All beta coefficients have p values less than .05 except arpu_7, removing it and checking again in next model.
+
+Building 3rd Logistic Regression model
+# Building Logistic Regression model using statsmodels
+X_train_final.drop('arpu_7', axis= 1, inplace= True) # Removing column
+lreg3= sm.GLM(y_train_sm, X_train_final, family= sm.families.Binomial())
+lreg_model_3= lreg3.fit() # Fitting the model
+# Checking the summary of Regression model
+print(lreg_model_3.summary())
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:                      y   No. Observations:                38528
+Model:                            GLM   Df Residuals:                    38509
+Model Family:                Binomial   Df Model:                           18
+Link Function:                  logit   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -15137.
+Date:                Wed, 03 Nov 2021   Deviance:                       30275.
+Time:                        15:56:22   Pearson chi2:                 1.02e+10
+No. Iterations:                     7                                         
+Covariance Type:            nonrobust                                         
+======================================================================================
+                         coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+const                  1.3364      0.022     61.514      0.000       1.294       1.379
+arpu_6                 1.0002      0.069     14.500      0.000       0.865       1.135
+onnet_mou_7            0.4671      0.075      6.228      0.000       0.320       0.614
+roam_og_mou_7          0.7021      0.055     12.861      0.000       0.595       0.809
+loc_og_mou_8          -1.3320      0.123    -10.801      0.000      -1.574      -1.090
+total_og_mou_8        -1.2722      0.096    -13.194      0.000      -1.461      -1.083
+loc_ic_t2m_mou_7       0.8975      0.192      4.684      0.000       0.522       1.273
+loc_ic_mou_7           2.1770      0.233      9.356      0.000       1.721       2.633
+loc_ic_mou_8          -5.4925      0.295    -18.643      0.000      -6.070      -4.915
+total_ic_mou_8        -2.1079      0.213     -9.908      0.000      -2.525      -1.691
+spl_ic_mou_8          -0.8783      0.066    -13.392      0.000      -1.007      -0.750
+total_rech_num_7       1.9865      0.101     19.633      0.000       1.788       2.185
+total_rech_num_8      -3.0782      0.122    -25.317      0.000      -3.316      -2.840
+max_rech_amt_7         0.5855      0.067      8.706      0.000       0.454       0.717
+last_day_rch_amt_8    -1.2855      0.058    -22.009      0.000      -1.400      -1.171
+count_rech_2g_8       -1.0948      0.098    -11.170      0.000      -1.287      -0.903
+fb_user_8             -1.1643      0.042    -27.699      0.000      -1.247      -1.082
+aon                   -0.9985      0.058    -17.275      0.000      -1.112      -0.885
+vbc_3g_8              -1.1903      0.085    -14.030      0.000      -1.357      -1.024
+======================================================================================
+# Calculating the VIFs for the 3rd model
+vif_calculation(X_train_final)
+Features	VIF
+7	loc_ic_mou_8	9.44
+8	total_ic_mou_8	6.87
+6	loc_ic_mou_7	6.70
+5	loc_ic_t2m_mou_7	4.44
+11	total_rech_num_8	3.05
+4	total_og_mou_8	2.94
+3	loc_og_mou_8	2.19
+10	total_rech_num_7	2.18
+15	fb_user_8	2.07
+14	count_rech_2g_8	1.72
+1	onnet_mou_7	1.68
+13	last_day_rch_amt_8	1.48
+17	vbc_3g_8	1.35
+12	max_rech_amt_7	1.35
+16	aon	1.25
+0	arpu_6	1.17
+2	roam_og_mou_7	1.12
+9	spl_ic_mou_8	1.04
+All beta coefficients have p values less than .05 but loc_ic_mou_8 has high VIF, removing it and checking again in next model.
+
+Building 4th Logistic Regression model
+# Building Logistic Regression model using statsmodels
+X_train_final.drop('loc_ic_mou_8', axis= 1, inplace= True) # Removing column
+lreg4= sm.GLM(y_train_sm, X_train_final, family= sm.families.Binomial())
+lreg_model_4= lreg4.fit() # Fitting the model
+# Checking the summary of Logistic Regression model
+print(lreg_model_4.summary())
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:                      y   No. Observations:                38528
+Model:                            GLM   Df Residuals:                    38510
+Model Family:                Binomial   Df Model:                           17
+Link Function:                  logit   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -15300.
+Date:                Wed, 03 Nov 2021   Deviance:                       30601.
+Time:                        15:56:32   Pearson chi2:                 6.50e+09
+No. Iterations:                     7                                         
+Covariance Type:            nonrobust                                         
+======================================================================================
+                         coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+const                  1.3135      0.022     60.578      0.000       1.271       1.356
+arpu_6                 1.0906      0.069     15.725      0.000       0.955       1.227
+onnet_mou_7            0.4727      0.075      6.291      0.000       0.325       0.620
+roam_og_mou_7          0.7275      0.055     13.137      0.000       0.619       0.836
+loc_og_mou_8          -1.9446      0.124    -15.624      0.000      -2.189      -1.701
+total_og_mou_8        -1.2276      0.096    -12.724      0.000      -1.417      -1.039
+loc_ic_t2m_mou_7       0.7811      0.176      4.438      0.000       0.436       1.126
+loc_ic_mou_7           1.0751      0.206      5.230      0.000       0.672       1.478
+total_ic_mou_8        -5.4878      0.175    -31.315      0.000      -5.831      -5.144
+spl_ic_mou_8          -0.8791      0.066    -13.342      0.000      -1.008      -0.750
+total_rech_num_7       2.1981      0.101     21.804      0.000       2.001       2.396
+total_rech_num_8      -3.2639      0.121    -26.892      0.000      -3.502      -3.026
+max_rech_amt_7         0.6633      0.068      9.783      0.000       0.530       0.796
+last_day_rch_amt_8    -1.3106      0.059    -22.228      0.000      -1.426      -1.195
+count_rech_2g_8       -1.0965      0.097    -11.264      0.000      -1.287      -0.906
+fb_user_8             -1.2000      0.042    -28.707      0.000      -1.282      -1.118
+aon                   -1.0351      0.057    -18.106      0.000      -1.147      -0.923
+vbc_3g_8              -1.2119      0.085    -14.309      0.000      -1.378      -1.046
+======================================================================================
+# Calculating the VIFs for the 4th model
+vif_calculation(X_train_final)
+Features	VIF
+6	loc_ic_mou_7	5.77
+5	loc_ic_t2m_mou_7	4.43
+10	total_rech_num_8	3.03
+4	total_og_mou_8	2.93
+7	total_ic_mou_8	2.85
+9	total_rech_num_7	2.16
+3	loc_og_mou_8	2.09
+14	fb_user_8	2.06
+13	count_rech_2g_8	1.72
+1	onnet_mou_7	1.68
+12	last_day_rch_amt_8	1.48
+16	vbc_3g_8	1.35
+11	max_rech_amt_7	1.35
+15	aon	1.25
+0	arpu_6	1.17
+2	roam_og_mou_7	1.12
+8	spl_ic_mou_8	1.04
+All beta coefficients have p values less than .05 but loc_ic_mou_7 has high VIF, removing it and checking again in next model.
+
+Building 5th Logistic Regression model
+# Building Logistic Regression model using statsmodels
+X_train_final.drop('loc_ic_mou_7', axis= 1, inplace= True) # Removing column
+lreg5= sm.GLM(y_train_sm, X_train_final, family= sm.families.Binomial())
+lreg_model_5= lreg5.fit() # Fitting the model
+# Checking the summary of Logistic Regression model
+print(lreg_model_5.summary())
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:                      y   No. Observations:                38528
+Model:                            GLM   Df Residuals:                    38511
+Model Family:                Binomial   Df Model:                           16
+Link Function:                  logit   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -15314.
+Date:                Wed, 03 Nov 2021   Deviance:                       30629.
+Time:                        15:56:44   Pearson chi2:                 7.12e+09
+No. Iterations:                     7                                         
+Covariance Type:            nonrobust                                         
+======================================================================================
+                         coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+const                  1.3107      0.022     60.510      0.000       1.268       1.353
+arpu_6                 1.1004      0.069     15.860      0.000       0.964       1.236
+onnet_mou_7            0.5213      0.075      6.968      0.000       0.375       0.668
+roam_og_mou_7          0.7123      0.055     12.923      0.000       0.604       0.820
+loc_og_mou_8          -1.8841      0.123    -15.300      0.000      -2.125      -1.643
+total_og_mou_8        -1.2811      0.096    -13.303      0.000      -1.470      -1.092
+loc_ic_t2m_mou_7       1.5402      0.102     15.102      0.000       1.340       1.740
+total_ic_mou_8        -5.2281      0.166    -31.494      0.000      -5.553      -4.903
+spl_ic_mou_8          -0.8815      0.066    -13.360      0.000      -1.011      -0.752
+total_rech_num_7       2.2277      0.101     22.141      0.000       2.031       2.425
+total_rech_num_8      -3.3065      0.121    -27.287      0.000      -3.544      -3.069
+max_rech_amt_7         0.6642      0.068      9.794      0.000       0.531       0.797
+last_day_rch_amt_8    -1.3116      0.059    -22.247      0.000      -1.427      -1.196
+count_rech_2g_8       -1.0918      0.097    -11.228      0.000      -1.282      -0.901
+fb_user_8             -1.2069      0.042    -28.902      0.000      -1.289      -1.125
+aon                   -1.0177      0.057    -17.863      0.000      -1.129      -0.906
+vbc_3g_8              -1.2070      0.085    -14.281      0.000      -1.373      -1.041
+======================================================================================
+# Calculating the VIFs for the 5th model
+vif_calculation(X_train_final)
+Features	VIF
+9	total_rech_num_8	3.02
+4	total_og_mou_8	2.89
+6	total_ic_mou_8	2.25
+8	total_rech_num_7	2.15
+3	loc_og_mou_8	2.08
+13	fb_user_8	2.06
+5	loc_ic_t2m_mou_7	1.92
+12	count_rech_2g_8	1.72
+1	onnet_mou_7	1.66
+11	last_day_rch_amt_8	1.48
+10	max_rech_amt_7	1.35
+15	vbc_3g_8	1.35
+14	aon	1.25
+0	arpu_6	1.17
+2	roam_og_mou_7	1.12
+7	spl_ic_mou_8	1.04
+All beta coefficients have p values less than .05 and VIF values are also lower than 5.
+
+# Evaluating on Training dataset
+y_train_pred= pd.DataFrame(lreg_model_5.predict(X_train_final), columns=['prob'])
+y_train_pred['pred_churn']= y_train_pred.prob.map(lambda x: 1 if x > 0.5 else 0) # Setting decision margin at .5
+y_train_pred= y_train_pred.merge(pd.DataFrame(y_train_sm, columns= ['churn']), how= 'inner', left_index= True, right_index= True)
+# Get Confusion matrix
+tn,fp,fn,tp= confusion_matrix(y_true= y_train_pred.churn, y_pred= y_train_pred.pred_churn).ravel()
+print('Confusion Matrix on Training dataset:')
+print('True Negative:',tn, '    ','False Positive:',fp)
+print('False Negative:',fn,'    ','True Positive:',tp, '\n')
+print('Classification Report on Training dataset:\n', classification_report(y_true= y_train_pred.churn, y_pred= y_train_pred.pred_churn))
+Confusion Matrix on Training dataset:
+True Negative: 15879      False Positive: 3385
+False Negative: 2959      True Positive: 16305 
+
+Classification Report on Training dataset:
+               precision    recall  f1-score   support
+
+           0       0.84      0.82      0.83     19264
+           1       0.83      0.85      0.84     19264
+
+    accuracy                           0.84     38528
+   macro avg       0.84      0.84      0.84     38528
+weighted avg       0.84      0.84      0.84     38528
+
+# Craeting a function to plot ROC curve
+
+def roc_plot(actual, probs):
+    fpr, tpr, thresholds= roc_curve(actual, probs, drop_intermediate = False )
+    auc_score= roc_auc_score(actual, probs)
+    plt.figure(figsize=(6, 6))
+    plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % auc_score)
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate (1 - Specificity)')
+    plt.ylabel('True Positive Rate (Sensitivity)')
+    plt.title('Receiver Operating Characteristic')
+    plt.legend(loc="lower right")
+    plt.show()
+# Ploting ROC curve
+fpr, tpr, thresholds= roc_curve(y_train_pred.churn, y_train_pred.pred_churn, drop_intermediate = False )
+roc_plot(y_train_pred.churn, y_train_pred.prob)
+
+Finding Optimal Probability Cutoff Point
+# Creating different label columns using different probability cutoffs
+num= [float(x)/10 for x in range(10)]
+for i in num:
+    y_train_pred[i]=  y_train_pred.prob.map(lambda x: 1 if x > i else 0)
+y_train_pred.head()
+prob	pred_churn	churn	0.0	0.1	0.2	0.3	0.4	0.5	0.6	0.7	0.8	0.9
+0	0.061361	0	0	1	0	0	0	0	0	0	0	0	0
+1	0.246224	0	0	1	1	1	0	0	0	0	0	0	0
+2	0.094135	0	0	1	0	0	0	0	0	0	0	0	0
+3	0.003579	0	0	1	0	0	0	0	0	0	0	0	0
+4	0.408846	0	0	1	1	1	1	1	0	0	0	0	0
+# Calculating accuracy sensitivity and specificity for various probability cutoffs.
+
+plot_df= pd.DataFrame(columns = ['prob','accuracy','sensitivity','specificity'])
+
+for n in num:
+    TN,FP,FN,TP= confusion_matrix(y_true= y_train_pred.churn, y_pred= y_train_pred[n]).ravel()
+    accuracy= (TN+TP)/float(TN+FP+FN+TP)
+    specificity= TN / float(TN+FP)
+    sensitivity= TP / float(TP+FN)
+    plot_df.loc[n]= [n,accuracy,sensitivity,specificity]
+    
+plot_df
+prob	accuracy	sensitivity	specificity
+0.0	0.0	0.500000	1.000000	0.000000
+0.1	0.1	0.691835	0.977108	0.406561
+0.2	0.2	0.761265	0.953748	0.568781
+0.3	0.3	0.798718	0.923277	0.674159
+0.4	0.4	0.824310	0.889483	0.759136
+0.5	0.5	0.835341	0.846397	0.824284
+0.6	0.6	0.835470	0.794902	0.876038
+0.7	0.7	0.822415	0.730845	0.913985
+0.8	0.8	0.784417	0.621678	0.947155
+0.9	0.9	0.641274	0.300405	0.982143
+# Ploting Accuracy, Sensitivity and Specificity for different probability cutoffs
+
+plot_df.plot.line(x= 'prob', y= ['accuracy','sensitivity','specificity'])
+plt.show()
+
+Probability cutoff .5 is well balanced.
+
+Final Logistic Regression Summary
+print(lreg_model_5.summary())
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:                      y   No. Observations:                38528
+Model:                            GLM   Df Residuals:                    38511
+Model Family:                Binomial   Df Model:                           16
+Link Function:                  logit   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -15314.
+Date:                Wed, 03 Nov 2021   Deviance:                       30629.
+Time:                        15:57:16   Pearson chi2:                 7.12e+09
+No. Iterations:                     7                                         
+Covariance Type:            nonrobust                                         
+======================================================================================
+                         coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------
+const                  1.3107      0.022     60.510      0.000       1.268       1.353
+arpu_6                 1.1004      0.069     15.860      0.000       0.964       1.236
+onnet_mou_7            0.5213      0.075      6.968      0.000       0.375       0.668
+roam_og_mou_7          0.7123      0.055     12.923      0.000       0.604       0.820
+loc_og_mou_8          -1.8841      0.123    -15.300      0.000      -2.125      -1.643
+total_og_mou_8        -1.2811      0.096    -13.303      0.000      -1.470      -1.092
+loc_ic_t2m_mou_7       1.5402      0.102     15.102      0.000       1.340       1.740
+total_ic_mou_8        -5.2281      0.166    -31.494      0.000      -5.553      -4.903
+spl_ic_mou_8          -0.8815      0.066    -13.360      0.000      -1.011      -0.752
+total_rech_num_7       2.2277      0.101     22.141      0.000       2.031       2.425
+total_rech_num_8      -3.3065      0.121    -27.287      0.000      -3.544      -3.069
+max_rech_amt_7         0.6642      0.068      9.794      0.000       0.531       0.797
+last_day_rch_amt_8    -1.3116      0.059    -22.247      0.000      -1.427      -1.196
+count_rech_2g_8       -1.0918      0.097    -11.228      0.000      -1.282      -0.901
+fb_user_8             -1.2069      0.042    -28.902      0.000      -1.289      -1.125
+aon                   -1.0177      0.057    -17.863      0.000      -1.129      -0.906
+vbc_3g_8              -1.2070      0.085    -14.281      0.000      -1.373      -1.041
+======================================================================================
+# Evaluating on Testing dataset
+final_cols= X_train_final.columns.tolist()
+final_cols.remove('const')
+X_test_final= X_test[final_cols]
+X_test_final= sm.add_constant(X_test_final) # Adding constraints
+y_test_pred= pd.DataFrame(lreg_model_5.predict(X_test_final), columns=['prob'])
+y_test_pred['pred_churn']= y_test_pred.prob.map(lambda x: 1 if x > 0.5 else 0) # Setting decision margin at .5
+y_test_pred= y_test_pred.merge(pd.DataFrame(y_test, columns= ['churn']), how= 'inner', left_index= True, right_index= True)
+lr_final_cl_report_test= classification_report(y_true= y_test_pred.churn, y_pred= y_test_pred.pred_churn)
+print('Classification Report on Testing Dataset:\n', lr_final_cl_report_test)
+Classification Report on Testing Dataset:
+               precision    recall  f1-score   support
+
+           0       0.98      0.81      0.89      8256
+           1       0.28      0.81      0.41       730
+
+    accuracy                           0.81      8986
+   macro avg       0.63      0.81      0.65      8986
+weighted avg       0.92      0.81      0.85      8986
+
+We have got almost similar Accuracy and Recall on training and testing dataset.
+On training dataset, we have got Recall of .81 and overall accuracy .81
+According to business requirements we need to identify potential users who are likely to churn, we need a model with good Recall/Sensitivity (The model should identify as many True Positive as possible, in this process the model may identify some False Positives as probable churn customer).
+Here probability cutoff .5 is well balanced. If business wants to increase Recall/Sensitivity further, then this probability cut-off can be reduced to .4 or .3, but in that case specificity and precision will reduce further (More users will be identified as churners who are not).
+Performing PCA
+# Performing PCA and scree plot
+pca= PCA(random_state= 42)
+pca.fit(X_train_sm)
+plt.figure(figsize= [12,7])
+plt.plot(range(1, len(pca.explained_variance_ratio_)+1), np.cumsum(pca.explained_variance_ratio_))
+plt.xlabel('No. of Principal Components')
+plt.ylabel('Cumulative variance explained')
+plt.show()
+
+# Checking no. of components required to explain 97% variance
+pca= PCA(.97, random_state= 42)
+pca.fit(X_train_sm)
+plt.figure(figsize= [12,7])
+plt.plot(range(1, len(pca.explained_variance_ratio_)+1), np.cumsum(pca.explained_variance_ratio_))
+plt.xlabel('No. of Principal Components')
+plt.ylabel('Cumulative variance explained')
+plt.show()
+
+39 principal components can explain 97% variance in traininging dataset.
+
+# Transforming training and tetsing dataset
+X_train_pc= pca.transform(X_train_sm)
+X_test_pc= pca.transform(X_test)
+# Shape of new test and train dataset
+X_train_pc.shape, X_test_pc.shape
+((38528, 39), (8986, 39))
+# Checking correlation coefficients of principal components
+plt.figure(figsize= (12,7))
+sns.heatmap(pd.DataFrame(X_train_pc).corr(), cmap= 'coolwarm')
+plt.show()
+
+As all principal components are orthogonal to each other, so they have no correlation with each other.
+
+2. Random Forest Classifier
+# Using Random Forest Classifier
+rfc= RandomForestClassifier(random_state= 42)
+rfc.fit(X_train_pc, y_train_sm)
+y_train_pred= rfc.predict(X_train_pc)
+y_test_pred= rfc.predict(X_test_pc)
+# Classification report on training dataset
+print(classification_report(y_train_sm, y_train_pred))
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00     19264
+           1       1.00      1.00      1.00     19264
+
+    accuracy                           1.00     38528
+   macro avg       1.00      1.00      1.00     38528
+weighted avg       1.00      1.00      1.00     38528
+
+# Classification report on testing dataset
+print(classification_report(y_test, y_test_pred))
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.95      8256
+           1       0.44      0.60      0.51       730
+
+    accuracy                           0.90      8986
+   macro avg       0.70      0.76      0.73      8986
+weighted avg       0.92      0.90      0.91      8986
+
+It can be seen that our Random Forest model is showing overfitting. We'll use hyperparameter tunning to reduce the variance of the model. According to our business requirement we need higher recall/sensitivity for class 1. That means the model should identify as much True Positive as possible (users likely to churn, should not be missed).
+
+Random Forest- Hyperparameter tunning
+# Performing GridSearchCV
+rfc= RandomForestClassifier(random_state= 42)
+param_grid= { 'n_estimators': [100, 200, 300, 500],
+             'max_depth': [4, 5, 9, 12, 15],
+             'min_samples_leaf': [15, 20, 25]
+             }
+gcv_rfc= GridSearchCV(estimator= rfc, param_grid= param_grid, cv= 3, scoring= 'recall', n_jobs= -1, return_train_score= True, verbose= 1)
+gcv_rfc_fit= gcv_rfc.fit(X_train_pc, y_train_sm)
+Fitting 3 folds for each of 60 candidates, totalling 180 fits
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 4 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  42 tasks      | elapsed:  3.1min
+[Parallel(n_jobs=-1)]: Done 180 out of 180 | elapsed: 22.6min finished
+# Checking best parameters
+gcv_rfc_fit.best_params_
+{'max_depth': 15, 'min_samples_leaf': 15, 'n_estimators': 500}
+# Storing CV result
+rfcv_df= pd.DataFrame(gcv_rfc_fit.cv_results_)
+#joblib.dump(rfcv_df, '/content/drive/MyDrive/colab_data/rfcv_df.pkl')
+#rfcv_df= joblib.load('/content/drive/MyDrive/colab_data/rfcv_df.pkl')
+rfcv_df.sort_values('mean_train_score', ascending= False).head(100) # Displaying top 100
+mean_fit_time	std_fit_time	mean_score_time	std_score_time	param_max_depth	param_min_samples_leaf	param_n_estimators	params	split0_test_score	split1_test_score	split2_test_score	mean_test_score	std_test_score	rank_test_score	split0_train_score	split1_train_score	split2_train_score	mean_train_score	std_train_score
+48	14.016037	0.142551	0.218819	0.008282	15	15	100	{'max_depth': 15, 'min_samples_leaf': 15, 'n_e...	0.865037	0.878113	0.887609	0.876920	0.009253	2	0.926915	0.925592	0.926681	0.926396	0.000577
+49	28.254259	0.053497	0.429154	0.014635	15	15	200	{'max_depth': 15, 'min_samples_leaf': 15, 'n_e...	0.864882	0.877958	0.886052	0.876297	0.008722	3	0.926681	0.925592	0.926681	0.926318	0.000514
+51	70.148411	0.162684	1.033500	0.026075	15	15	500	{'max_depth': 15, 'min_samples_leaf': 15, 'n_e...	0.864882	0.878425	0.888543	0.877283	0.009693	1	0.925514	0.926136	0.926837	0.926162	0.000540
+50	42.347175	0.083870	0.625415	0.024131	15	15	300	{'max_depth': 15, 'min_samples_leaf': 15, 'n_e...	0.862080	0.878269	0.886675	0.875675	0.010207	4	0.925981	0.925903	0.926526	0.926136	0.000277
+39	67.170846	0.298803	1.000725	0.030426	12	15	500	{'max_depth': 12, 'min_samples_leaf': 15, 'n_e...	0.850872	0.869085	0.878113	0.866023	0.011330	7	0.913294	0.912049	0.913839	0.913060	0.000749
+36	13.520875	0.124327	0.194811	0.000656	12	15	100	{'max_depth': 12, 'min_samples_leaf': 15, 'n_e...	0.855230	0.868618	0.876401	0.866750	0.008743	5	0.915395	0.911192	0.912593	0.913060	0.001747
+37	26.420143	0.045961	0.389257	0.010618	12	15	200	{'max_depth': 12, 'min_samples_leaf': 15, 'n_e...	0.854296	0.868618	0.875778	0.866231	0.008931	6	0.912905	0.911659	0.913605	0.912723	0.000805
+38	39.897761	0.098425	0.591277	0.017785	12	15	300	{'max_depth': 12, 'min_samples_leaf': 15, 'n_e...	0.851650	0.868306	0.876712	0.865556	0.010415	8	0.911893	0.911115	0.912827	0.911945	0.000700
+53	27.267654	0.071423	0.414066	0.024682	15	20	200	{'max_depth': 15, 'min_samples_leaf': 20, 'n_e...	0.848692	0.864103	0.873132	0.861976	0.010090	11	0.905588	0.905978	0.905744	0.905770	0.000160
+54	41.184572	0.232861	0.616965	0.015080	15	20	300	{'max_depth': 15, 'min_samples_leaf': 20, 'n_e...	0.849315	0.864882	0.872665	0.862287	0.009707	10	0.904732	0.906055	0.905900	0.905562	0.000590
+55	68.522378	0.325595	1.025483	0.016030	15	20	500	{'max_depth': 15, 'min_samples_leaf': 20, 'n_e...	0.850872	0.864259	0.872354	0.862495	0.008858	9	0.905277	0.905355	0.905822	0.905485	0.000241
+52	13.564659	0.020161	0.203803	0.005580	15	20	100	{'max_depth': 15, 'min_samples_leaf': 20, 'n_e...	0.847914	0.861613	0.870486	0.860004	0.009285	12	0.905355	0.904265	0.905277	0.904966	0.000496
+43	65.807177	0.176646	1.007979	0.013370	12	20	500	{'max_depth': 12, 'min_samples_leaf': 20, 'n_e...	0.842310	0.859278	0.865660	0.855749	0.009854	13	0.896248	0.897883	0.894225	0.896119	0.001496
+40	13.145424	0.131768	0.194087	0.006035	12	20	100	{'max_depth': 12, 'min_samples_leaf': 20, 'n_e...	0.841999	0.857565	0.862235	0.853933	0.008652	16	0.895704	0.897961	0.894536	0.896067	0.001422
+41	26.297314	0.042712	0.386859	0.008107	12	20	200	{'max_depth': 12, 'min_samples_leaf': 20, 'n_e...	0.842154	0.858188	0.863636	0.854660	0.009118	15	0.895081	0.898116	0.894847	0.896015	0.001489
+42	39.145670	0.063541	0.572410	0.014115	12	20	300	{'max_depth': 12, 'min_samples_leaf': 20, 'n_e...	0.843088	0.858655	0.864103	0.855282	0.008905	14	0.895003	0.896638	0.893680	0.895107	0.001210
+58	39.902652	0.089074	0.583407	0.005905	15	25	300	{'max_depth': 15, 'min_samples_leaf': 25, 'n_e...	0.839041	0.853051	0.860990	0.851027	0.009074	17	0.889944	0.889788	0.890100	0.889944	0.000127
+57	26.788967	0.269184	0.390207	0.010864	15	25	200	{'max_depth': 15, 'min_samples_leaf': 25, 'n_e...	0.837640	0.853362	0.859900	0.850301	0.009342	20	0.889633	0.890644	0.889477	0.889918	0.000518
+59	55.937028	2.433250	0.770998	0.024160	15	25	500	{'max_depth': 15, 'min_samples_leaf': 25, 'n_e...	0.838107	0.853829	0.861146	0.851027	0.009612	17	0.888699	0.890100	0.888854	0.889218	0.000627
+56	13.491218	0.131324	0.218190	0.005366	15	25	100	{'max_depth': 15, 'min_samples_leaf': 25, 'n_e...	0.838263	0.854919	0.859433	0.850872	0.009104	19	0.889088	0.890411	0.887609	0.889036	0.001144
+46	38.530573	0.031976	0.583874	0.016465	12	25	300	{'max_depth': 12, 'min_samples_leaf': 25, 'n_e...	0.835616	0.846980	0.855853	0.846150	0.008282	21	0.884184	0.882394	0.882316	0.882965	0.000863
+47	63.616663	0.052079	0.950955	0.027602	12	25	500	{'max_depth': 12, 'min_samples_leaf': 25, 'n_e...	0.835772	0.846669	0.855853	0.846098	0.008208	22	0.883484	0.881616	0.883172	0.882757	0.000817
+45	25.655192	0.063117	0.375252	0.008148	12	25	200	{'max_depth': 12, 'min_samples_leaf': 25, 'n_e...	0.834060	0.847136	0.855386	0.845527	0.008780	24	0.884029	0.880915	0.882316	0.882420	0.001273
+44	12.977073	0.082455	0.199607	0.006996	12	25	100	{'max_depth': 12, 'min_samples_leaf': 25, 'n_e...	0.834682	0.847136	0.854919	0.845579	0.008335	23	0.885118	0.880604	0.880915	0.882213	0.002059
+25	23.059333	0.030260	0.336578	0.006566	9	15	200	{'max_depth': 9, 'min_samples_leaf': 15, 'n_es...	0.827055	0.834371	0.849004	0.836810	0.009125	25	0.866905	0.861846	0.867606	0.865452	0.002566
+27	58.220714	0.255789	0.874324	0.030676	9	15	500	{'max_depth': 9, 'min_samples_leaf': 15, 'n_es...	0.826276	0.835928	0.846980	0.836395	0.008459	26	0.867995	0.862158	0.865894	0.865349	0.002414
+24	11.658743	0.083626	0.167712	0.002200	9	15	100	{'max_depth': 9, 'min_samples_leaf': 15, 'n_es...	0.827677	0.833126	0.848070	0.836291	0.008621	27	0.867139	0.859978	0.867061	0.864726	0.003357
+26	34.719189	0.116173	0.521798	0.025354	9	15	300	{'max_depth': 9, 'min_samples_leaf': 15, 'n_es...	0.824875	0.834527	0.845890	0.835098	0.008589	28	0.866828	0.861224	0.865971	0.864674	0.002465
+28	11.478462	0.062797	0.183062	0.001354	9	20	100	{'max_depth': 9, 'min_samples_leaf': 20, 'n_es...	0.820205	0.830635	0.841532	0.830791	0.008707	30	0.863325	0.853985	0.858266	0.858525	0.003817
+29	23.003846	0.095823	0.340396	0.020976	9	20	200	{'max_depth': 9, 'min_samples_leaf': 20, 'n_es...	0.821606	0.831880	0.841999	0.831829	0.008325	29	0.862702	0.854141	0.857721	0.858188	0.003511
+31	57.464901	0.278887	0.843902	0.010495	9	20	500	{'max_depth': 9, 'min_samples_leaf': 20, 'n_es...	0.820828	0.830324	0.839975	0.830376	0.007817	31	0.861613	0.853129	0.857098	0.857280	0.003466
+30	34.308997	0.258406	0.503858	0.010279	9	20	300	{'max_depth': 9, 'min_samples_leaf': 20, 'n_es...	0.818960	0.830324	0.840909	0.830064	0.008962	32	0.860212	0.853596	0.857799	0.857202	0.002734
+32	11.299340	0.046829	0.175009	0.010470	9	25	100	{'max_depth': 9, 'min_samples_leaf': 25, 'n_es...	0.819738	0.828300	0.836239	0.828093	0.006738	33	0.858577	0.853440	0.848459	0.853492	0.004131
+33	22.717996	0.110627	0.326961	0.001369	9	25	200	{'max_depth': 9, 'min_samples_leaf': 25, 'n_es...	0.816158	0.828767	0.837017	0.827314	0.008578	34	0.855386	0.853051	0.850249	0.852895	0.002100
+35	57.152411	0.285416	0.823036	0.017058	9	25	500	{'max_depth': 9, 'min_samples_leaf': 25, 'n_es...	0.817092	0.827210	0.836083	0.826795	0.007759	36	0.854296	0.849471	0.849549	0.851105	0.002257
+34	34.058335	0.080035	0.514540	0.023171	9	25	300	{'max_depth': 9, 'min_samples_leaf': 25, 'n_es...	0.817403	0.827210	0.836706	0.827107	0.007881	35	0.853752	0.849860	0.849315	0.850976	0.001976
+21	14.975398	0.140683	0.260551	0.017341	5	25	200	{'max_depth': 5, 'min_samples_leaf': 25, 'n_es...	0.761052	0.771326	0.773817	0.768732	0.005525	37	0.782223	0.776697	0.768991	0.775970	0.005426
+15	37.183341	0.039093	0.607550	0.007706	5	15	500	{'max_depth': 5, 'min_samples_leaf': 15, 'n_es...	0.758562	0.768680	0.774751	0.767331	0.006678	41	0.780511	0.777475	0.769303	0.775763	0.004733
+13	14.831404	0.089916	0.249531	0.004335	5	15	200	{'max_depth': 5, 'min_samples_leaf': 15, 'n_es...	0.760118	0.768836	0.773973	0.767642	0.005719	39	0.781445	0.776852	0.768913	0.775737	0.005176
+23	37.186654	0.180475	0.607579	0.010382	5	25	500	{'max_depth': 5, 'min_samples_leaf': 25, 'n_es...	0.758873	0.768680	0.773039	0.766864	0.005924	42	0.781445	0.776541	0.768369	0.775451	0.005394
+14	22.203016	0.140231	0.362026	0.005704	5	15	300	{'max_depth': 5, 'min_samples_leaf': 15, 'n_es...	0.757161	0.769147	0.773817	0.766708	0.007015	44	0.779732	0.777008	0.769303	0.775348	0.004417
+19	36.962246	0.139054	0.620866	0.011149	5	20	500	{'max_depth': 5, 'min_samples_leaf': 20, 'n_es...	0.759184	0.768836	0.774595	0.767538	0.006358	40	0.780433	0.776775	0.768602	0.775270	0.004946
+17	14.833739	0.025063	0.259085	0.004017	5	20	200	{'max_depth': 5, 'min_samples_leaf': 20, 'n_es...	0.761364	0.769925	0.772727	0.768005	0.004834	38	0.781289	0.776541	0.767979	0.775270	0.005507
+22	22.194883	0.017805	0.380272	0.012575	5	25	300	{'max_depth': 5, 'min_samples_leaf': 25, 'n_es...	0.757161	0.770392	0.773039	0.766864	0.006946	42	0.780433	0.776930	0.767746	0.775036	0.005350
+18	22.232026	0.099540	0.385217	0.021746	5	20	300	{'max_depth': 5, 'min_samples_leaf': 20, 'n_es...	0.757316	0.769147	0.772105	0.766189	0.006389	45	0.779888	0.776385	0.767902	0.774725	0.005032
+20	7.420307	0.047380	0.125554	0.001339	5	25	100	{'max_depth': 5, 'min_samples_leaf': 25, 'n_es...	0.757939	0.762453	0.770237	0.763543	0.005079	46	0.782456	0.771949	0.764477	0.772961	0.007375
+12	7.387674	0.076324	0.123287	0.001220	5	15	100	{'max_depth': 5, 'min_samples_leaf': 15, 'n_es...	0.755604	0.762142	0.768524	0.762090	0.005275	48	0.780822	0.770237	0.763387	0.771482	0.007172
+16	7.422407	0.081301	0.125329	0.002703	5	20	100	{'max_depth': 5, 'min_samples_leaf': 20, 'n_es...	0.756382	0.761986	0.768213	0.762194	0.004832	47	0.779343	0.770159	0.762687	0.770730	0.006812
+1	12.274588	0.010130	0.236465	0.009229	4	15	200	{'max_depth': 4, 'min_samples_leaf': 15, 'n_es...	0.736301	0.742061	0.754514	0.744292	0.007601	52	0.754514	0.749922	0.747042	0.750493	0.003077
+9	12.387831	0.056643	0.232193	0.009058	4	25	200	{'max_depth': 4, 'min_samples_leaf': 25, 'n_es...	0.737235	0.743306	0.753736	0.744759	0.006814	49	0.753892	0.750389	0.746575	0.750285	0.002988
+5	12.420575	0.075552	0.238055	0.007458	4	20	200	{'max_depth': 4, 'min_samples_leaf': 20, 'n_es...	0.737080	0.742217	0.753736	0.744344	0.006964	51	0.753892	0.749844	0.746420	0.750052	0.003054
+0	6.158884	0.030232	0.124223	0.006622	4	15	100	{'max_depth': 4, 'min_samples_leaf': 15, 'n_es...	0.736924	0.741750	0.753269	0.743981	0.006857	55	0.754903	0.747354	0.747432	0.749896	0.003541
+4	6.139455	0.071952	0.123221	0.005653	4	20	100	{'max_depth': 4, 'min_samples_leaf': 20, 'n_es...	0.736924	0.741438	0.753425	0.743929	0.006963	56	0.754359	0.747432	0.747432	0.749741	0.003265
+3	30.747000	0.117322	0.583328	0.020543	4	15	500	{'max_depth': 4, 'min_samples_leaf': 15, 'n_es...	0.735990	0.743306	0.754047	0.744448	0.007416	50	0.753969	0.749144	0.746031	0.749715	0.003266
+8	6.190544	0.058570	0.119355	0.001979	4	25	100	{'max_depth': 4, 'min_samples_leaf': 25, 'n_es...	0.736768	0.740349	0.753425	0.743514	0.007159	57	0.754359	0.747120	0.747276	0.749585	0.003376
+7	30.812987	0.244229	0.570553	0.010319	4	20	500	{'max_depth': 4, 'min_samples_leaf': 20, 'n_es...	0.736301	0.742684	0.753580	0.744188	0.007134	53	0.753425	0.748521	0.746731	0.749559	0.002829
+11	30.795277	0.155195	0.551632	0.004410	4	25	500	{'max_depth': 4, 'min_samples_leaf': 25, 'n_es...	0.736146	0.743151	0.753113	0.744137	0.006962	54	0.753035	0.748210	0.746342	0.749196	0.002820
+6	18.224634	0.099300	0.348213	0.009015	4	20	300	{'max_depth': 4, 'min_samples_leaf': 20, 'n_es...	0.734900	0.740349	0.752802	0.742684	0.007492	60	0.752257	0.748521	0.744785	0.748521	0.003050
+10	18.300977	0.023573	0.337549	0.005205	4	25	300	{'max_depth': 4, 'min_samples_leaf': 25, 'n_es...	0.735212	0.740971	0.753269	0.743151	0.007531	58	0.751790	0.748054	0.745019	0.748288	0.002769
+2	18.552505	0.093518	0.349731	0.025668	4	15	300	{'max_depth': 4, 'min_samples_leaf': 15, 'n_es...	0.735367	0.740971	0.752646	0.742995	0.007198	59	0.751868	0.747899	0.744863	0.748210	0.002868
+# Plotting param_max_depth vs mean_train_score (mean of cross validation accuracy)
+plt.figure(figsize= (12,7))
+sns.lineplot(data= rfcv_df, x= 'param_max_depth', y= 'mean_train_score' )
+plt.show()
+
+We can see that with increase in max_depth, recall is incraesing. After 12 slope has been reduced. We'll go with 12.
+
+# Plotting param_max_depth vs mean_train_score (mean of cross validation recall) for param_max_depth= 12
+plt.figure(figsize= (12,7))
+sns.lineplot(data= rfcv_df[(rfcv_df.param_max_depth == 12)], x= 'param_n_estimators', y= 'mean_train_score' )
+plt.show()
+
+It can be seen with max_depth= 12, after n_estimators= 300 there is almost no change in score.
+
+# Plotting param_max_depth vs mean_train_score (mean of cross validation accuracy) for param_max_depth= 15
+plt.figure(figsize= (12,7))
+sns.lineplot(data= rfcv_df[(rfcv_df.param_max_depth == 12) & (rfcv_df.param_n_estimators== 300)], x= 'param_min_samples_leaf', y= 'mean_train_score' )
+plt.show()
+
+# Building Random Forest model with above parameters
+rfc= RandomForestClassifier(n_estimators= 300, max_depth= 12, min_samples_leaf= 15, random_state= 42)
+rfc.fit(X_train_pc, y_train_sm)
+y_train_pred= rfc.predict(X_train_pc)
+y_test_pred= rfc.predict(X_test_pc)
+print('Accuracy on trining data:' ,accuracy_score(y_train_sm, y_train_pred))
+print('Accuracy on testing data:' ,accuracy_score(y_test, y_test_pred))
+Accuracy on trining data: 0.9270660299003323
+Accuracy on testing data: 0.8791453371911863
+# Classification report on training dataset
+print('Accuracy on testing data: \n' ,classification_report(y_train_sm, y_train_pred))
+Accuracy on testing data: 
+               precision    recall  f1-score   support
+
+           0       0.94      0.92      0.93     19264
+           1       0.92      0.94      0.93     19264
+
+    accuracy                           0.93     38528
+   macro avg       0.93      0.93      0.93     38528
+weighted avg       0.93      0.93      0.93     38528
+
+# Classification report on testing dataset
+rfc_final_cl_report_test= classification_report(y_test, y_test_pred)
+print('Accuracy on testing data: \n' ,rfc_final_cl_report_test)
+Accuracy on testing data: 
+               precision    recall  f1-score   support
+
+           0       0.97      0.89      0.93      8256
+           1       0.37      0.72      0.49       730
+
+    accuracy                           0.88      8986
+   macro avg       0.67      0.80      0.71      8986
+weighted avg       0.92      0.88      0.90      8986
+
+O finally, after hyperparameters tunning we have got overall testing accuracy of .88 and recall of .72.
+
+XGBoost Classifier
+# Using XGBoost Classifier
+xgbcl= XGBClassifier(random_state= 42)
+xgbcl.fit(X_train_pc, y_train_sm)
+y_train_pred= xgbcl.predict(X_train_pc)
+y_test_pred= xgbcl.predict(X_test_pc)
+print('Accuracy on trining data:' ,accuracy_score(y_train_sm, y_train_pred))
+print('Accuracy on testing data:' ,accuracy_score(y_test, y_test_pred))
+Accuracy on trining data: 0.8565199335548173
+Accuracy on testing data: 0.8371911862897841
+# Classification report on training dataset
+print('Accuracy on testing data: \n' ,classification_report(y_train_sm, y_train_pred))
+Accuracy on testing data: 
+               precision    recall  f1-score   support
+
+           0       0.86      0.85      0.86     19264
+           1       0.85      0.86      0.86     19264
+
+    accuracy                           0.86     38528
+   macro avg       0.86      0.86      0.86     38528
+weighted avg       0.86      0.86      0.86     38528
+
+# Classification report on testing dataset
+print('Accuracy on testing data: \n' ,classification_report(y_test, y_test_pred))
+Accuracy on testing data: 
+               precision    recall  f1-score   support
+
+           0       0.98      0.84      0.90      8256
+           1       0.30      0.77      0.43       730
+
+    accuracy                           0.84      8986
+   macro avg       0.64      0.81      0.67      8986
+weighted avg       0.92      0.84      0.87      8986
+
+XGBoost Classifier - Hyperparameter tunning
+# Param grid
+param_grid= {'n_estimators': [100, 200, 300, 500],
+        'gamma': [.5, .7, 1],
+        'subsample': [.6,.9, 1],
+        'colsample_bytree': [.6, .9, 1],
+        'max_depth': [4, 6, 8, 9],
+        'learning_rate': [.01, .05, .1, .5]
+        }
+# Performing GridSearchCV
+xgbcl= XGBClassifier(tree_method='gpu_hist', predictor='gpu_predictor', random_state= 42)
+gcv_xgbcl= GridSearchCV(estimator= xgbcl, param_grid= param_grid, cv= 3, verbose=3, n_jobs= -1, scoring= 'recall', return_train_score= True)
+gcv_xgbcl_fit= gcv_xgbcl.fit(X_train_pc, y_train_sm)
+
+# Storing CV result
+xgbcl_df= pd.DataFrame(gcv_xgbcl_fit.cv_results_)
+#joblib.dump(xgbcl_df, '/content/drive/MyDrive/colab_data/xgbcl_df.pkl')
+Fitting 3 folds for each of 1728 candidates, totalling 5184 fits
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 4 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  24 tasks      | elapsed:   21.4s
+[Parallel(n_jobs=-1)]: Done 120 tasks      | elapsed:  6.9min
+[Parallel(n_jobs=-1)]: Done 280 tasks      | elapsed: 20.0min
+[Parallel(n_jobs=-1)]: Done 504 tasks      | elapsed: 31.6min
+[Parallel(n_jobs=-1)]: Done 792 tasks      | elapsed: 49.0min
+[Parallel(n_jobs=-1)]: Done 1144 tasks      | elapsed: 70.1min
+[Parallel(n_jobs=-1)]: Done 1560 tasks      | elapsed: 97.4min
+[Parallel(n_jobs=-1)]: Done 2040 tasks      | elapsed: 127.1min
+[Parallel(n_jobs=-1)]: Done 2584 tasks      | elapsed: 160.2min
+[Parallel(n_jobs=-1)]: Done 3192 tasks      | elapsed: 196.5min
+[Parallel(n_jobs=-1)]: Done 3864 tasks      | elapsed: 236.1min
+[Parallel(n_jobs=-1)]: Done 4600 tasks      | elapsed: 278.1min
+[Parallel(n_jobs=-1)]: Done 5184 out of 5184 | elapsed: 312.8min finished
+['/content/drive/MyDrive/colab_data/xgbcl_df.pkl']
+# Loading stores result
+#xgbcl_df= joblib.load('/content/drive/MyDrive/colab_data/xgbcl_df.pkl')
+# Best estimator
+gcv_xgbcl_fit.best_estimator_
+XGBClassifier(base_score=0.5, booster='gbtree', colsample_bylevel=1,
+              colsample_bynode=1, colsample_bytree=1, gamma=0.5,
+              learning_rate=0.1, max_delta_step=0, max_depth=9,
+              min_child_weight=1, missing=None, n_estimators=500, n_jobs=1,
+              nthread=None, objective='binary:logistic',
+              predictor='gpu_predictor', random_state=42, reg_alpha=0,
+              reg_lambda=1, scale_pos_weight=1, seed=None, silent=None,
+              subsample=0.9, tree_method='gpu_hist', verbosity=1)
+# Checking CV result
+xgbcl_df.sort_values('mean_train_score', ascending= False)
+mean_fit_time	std_fit_time	mean_score_time	std_score_time	param_colsample_bytree	param_gamma	param_learning_rate	param_max_depth	param_n_estimators	param_subsample	params	split0_test_score	split1_test_score	split2_test_score	mean_test_score	std_test_score	rank_test_score	split0_train_score	split1_train_score	split2_train_score	mean_train_score	std_train_score
+1727	13.701613	3.745591	0.014704	0.002725	1	1	0.5	9	500	1	{'colsample_bytree': 1, 'gamma': 1, 'learning_...	0.968867	0.973381	0.975405	0.972551	0.002733	28	1.000000	1.000000	1.000000	1.000000	0.000000
+1629	45.034440	0.877254	0.019355	0.000525	1	1	0.05	9	500	0.6	{'colsample_bytree': 1, 'gamma': 1, 'learning_...	0.964041	0.970735	0.973070	0.969282	0.003826	187	1.000000	1.000000	1.000000	1.000000	0.000000
+738	8.477763	0.084547	0.017171	0.002336	0.9	0.5	0.5	6	300	0.6	{'colsample_bytree': 0.9, 'gamma': 0.5, 'learn...	0.958126	0.964508	0.967621	0.963418	0.003952	463	1.000000	1.000000	1.000000	1.000000	0.000000
+739	8.615278	0.137396	0.015573	0.000768	0.9	0.5	0.5	6	300	0.9	{'colsample_bytree': 0.9, 'gamma': 0.5, 'learn...	0.966999	0.969956	0.971202	0.969386	0.001763	175	1.000000	1.000000	1.000000	1.000000	0.000000
+740	8.353602	0.167968	0.016557	0.000928	0.9	0.5	0.5	6	300	1	{'colsample_bytree': 0.9, 'gamma': 0.5, 'learn...	0.962951	0.969801	0.971357	0.968037	0.003651	265	1.000000	1.000000	1.000000	1.000000	0.000000
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+1	1.835861	0.360892	0.014719	0.000950	0.6	0.5	0.01	4	100	0.9	{'colsample_bytree': 0.6, 'gamma': 0.5, 'learn...	0.765411	0.771638	0.781445	0.772831	0.006600	1717	0.784091	0.780277	0.774440	0.779603	0.003969
+385	1.344129	0.029467	0.015079	0.000730	0.6	1	0.01	4	100	0.9	{'colsample_bytree': 0.6, 'gamma': 1, 'learnin...	0.765411	0.771638	0.781445	0.772831	0.006600	1717	0.784091	0.780277	0.774440	0.779603	0.003969
+1346	1.392207	0.054927	0.015136	0.001288	1	0.7	0.01	4	100	1	{'colsample_bytree': 1, 'gamma': 0.7, 'learnin...	0.763387	0.761364	0.784558	0.769770	0.010489	1726	0.782923	0.773350	0.775374	0.777216	0.004120
+1538	1.363873	0.030980	0.014979	0.001027	1	1	0.01	4	100	1	{'colsample_bytree': 1, 'gamma': 1, 'learning_...	0.763387	0.761364	0.784558	0.769770	0.010489	1726	0.782923	0.773350	0.775374	0.777216	0.004120
+1154	1.398151	0.005815	0.015355	0.000963	1	0.5	0.01	4	100	1	{'colsample_bytree': 1, 'gamma': 0.5, 'learnin...	0.763387	0.761364	0.784558	0.769770	0.010489	1726	0.782923	0.773350	0.775374	0.777216	0.004120
+1728 rows × 22 columns
+
+# Checking best parameter from cv result
+xgbcl_df.sort_values('mean_train_score', ascending= False).loc[1727, 'params']
+{'colsample_bytree': 1,
+ 'gamma': 1,
+ 'learning_rate': 0.5,
+ 'max_depth': 9,
+ 'n_estimators': 500,
+ 'subsample': 1}
+# Using XGBoost Classifier
+xgbcl= XGBClassifier(booster='gbtree',colsample_bytree= 1, subsample= 1, gamma= 1,  learning_rate= 0.5, max_depth= 9, n_estimators= 500, n_jobs= -1,
+              random_state=42, verbosity=1)
+xgbcl.fit(X_train_pc, y_train_sm)
+y_train_pred= xgbcl.predict(X_train_pc)
+y_test_pred= xgbcl.predict(X_test_pc)
+print('Accuracy on trining data:' ,accuracy_score(y_train_sm, y_train_pred))
+print('Accuracy on testing data:' ,accuracy_score(y_test, y_test_pred))
+Accuracy on trining data: 1.0
+Accuracy on testing data: 0.8961718228355219
+# Classification report on training dataset
+print('Accuracy on testing data: \n' ,classification_report(y_train_sm, y_train_pred))
+Accuracy on testing data: 
+               precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00     19264
+           1       1.00      1.00      1.00     19264
+
+    accuracy                           1.00     38528
+   macro avg       1.00      1.00      1.00     38528
+weighted avg       1.00      1.00      1.00     38528
+
+# Classification report on testing dataset
+xgbc_final_cl_report_test= classification_report(y_test, y_test_pred)
+print('Accuracy on testing data: \n' ,xgbc_final_cl_report_test)
+Accuracy on testing data: 
+               precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94      8256
+           1       0.40      0.58      0.48       730
+
+    accuracy                           0.90      8986
+   macro avg       0.68      0.75      0.71      8986
+weighted avg       0.92      0.90      0.90      8986
+
+Conclusion and Recommendations
+We have performed data preprocessing, Missing Value Analysis, Feature Engineering, identified most valuable customers, tagged churners, and performed required EDA. We have mentioned few inferences observed during EDA.
+As part of data preparation, we have split the data into train-test dataset and performed SMOTE on training dataset to handle class imbalance. We have performed scaling (Used Robust scaling to handle outliers) before building our first model.
+We have used Logistic Regression model on actual features. We have used RFE to select top 20 features and then performed manual tunning to remove multicollinearity and make sure that all beta coefficients are statistically significant. From final Logistic Regression model, we can find below features importance to perform churn prediction.
+# Plotting important features with beta coefficients values
+plt.figure(figsize= (12,7))
+lreg_model_5.params.plot(kind= 'barh')
+plt.show()
+
+# Classifical report of our final logistic regression model
+print(lr_final_cl_report_test)
+              precision    recall  f1-score   support
+
+           0       0.98      0.81      0.89      8256
+           1       0.28      0.81      0.41       730
+
+    accuracy                           0.81      8986
+   macro avg       0.63      0.81      0.65      8986
+weighted avg       0.92      0.81      0.85      8986
+
+We have got almost similar Accuracy and Recall on training and testing dataset.
+Here probability cutoff .5 is well balanced. If business wants to increase Recall/Sensitivity further, then this probability cut-off can be reduced to .4 or .3, but in that case specificity and precision will reduce further (More users will be identify as churners who are actually not).
+Then we have performed PCA and kept 97% of variance by selecting 39 Principal Components. We used Random Forest and then performed hyperparameters tunning to tune our Random Forest model. Final Classification on testing dataset report after performing hyperparameters tunning is as below:
+# Printing classification report
+print(rfc_final_cl_report_test)
+              precision    recall  f1-score   support
+
+           0       0.97      0.89      0.93      8256
+           1       0.37      0.72      0.49       730
+
+    accuracy                           0.88      8986
+   macro avg       0.67      0.80      0.71      8986
+weighted avg       0.92      0.88      0.90      8986
+
+Followed by that, We used XGBoost Classifier and then perfomed hyperparameters tunning to tune our XGB Classifier model. Final Classification on testing dataset report after performing hyperparameters tunning is as below:
+# Printing classification report
+print(xgbc_final_cl_report_test)
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94      8256
+           1       0.40      0.58      0.48       730
+
+    accuracy                           0.90      8986
+   macro avg       0.68      0.75      0.71      8986
+weighted avg       0.92      0.90      0.90      8986
+
+If we compare all 3 models. XGBoost has highest accuracy then followed by Random Forest Classifier and Logistic Regression. But according to business requirements to identify potential users who are likely to churn, we need a model with good Recall/Sensitivity (The model should identify as many True Positive as possible, in this process the model may identify some False Positives as probable churn customer). In that regards Logistic Regression is the best model in metric of recall.
+As discussed earlier, probability cut-off of this logistic regression model can be reduced further to .4, .3 etc. to increase the recall further (if the business wants to be more aggressive to find all potential churn customers).
+From beta-coefficients of the Logistic Regression model, it can be seen that:
+total_ic_mou_8 (Total incoming call during month August/ action phase) is the most important feature. Other features like total_rech_num_8 (Total no. of recharge during action phase), loc_og_mou_8 (Local outgoing call during month 8/ Action phase). It can be seen features of action phase (8) and 2nd month of good phase (7) are the most important to determine if a user is going to churn or not. Business should focus on these features shown in above bar plot to identify possible churners and reach them to understand their pain points. For example, reduction in total incoming minutes, total local outgoing calls, no. of recharges, 3g data consumption, last recharge amount etc. in action phase (month 8), stopping fb service etc. may indicate high probability of churn.
